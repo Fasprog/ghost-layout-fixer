@@ -31,6 +31,36 @@ CliOptions CliParser::parse(int argc, const char* const argv[]) const
         options.command = CommandType::Restore;
     }
 
+    for (int index = 2; index < argc; ++index)
+    {
+        const std::string_view arg{argv[index]};
+        if (arg == "--layout" && index + 1 < argc)
+        {
+            options.layoutCode = argv[index + 1];
+            ++index;
+            continue;
+        }
+
+        if (arg == "--dry-run")
+        {
+            options.dryRun = true;
+            continue;
+        }
+
+        if (arg == "--yes")
+        {
+            options.assumeYes = true;
+            continue;
+        }
+
+        if (arg == "--file" && index + 1 < argc)
+        {
+            options.restoreFile = argv[index + 1];
+            ++index;
+            continue;
+        }
+    }
+
     return options;
 }
 

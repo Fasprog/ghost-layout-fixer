@@ -28,10 +28,13 @@ ghost-layout-fixer/
 │  ├─ platform/
 │  │  ├─ RegistryService.h
 │  │  ├─ SystemCommandRunner.h
+│  │  ├─ PrivilegeService.h
+│  │  ├─ InstalledLanguageService.h
 │  │  └─ src/
 │  │     ├─ RegistryService.cpp
 │  │     ├─ SystemCommandRunner.cpp
-│  │     └─ PrivilegeService.cpp
+│  │     ├─ PrivilegeService.cpp
+│  │     └─ InstalledLanguageService.cpp
 │  ├─ report/
 │  │  ├─ ReportPrinter.h
 │  │  └─ src/
@@ -118,6 +121,9 @@ ghost-layout-fixer/
 - `PrivilegeService`
   - проверка admin-прав перед mutating-операциями.
 
+- `InstalledLanguageService`
+  - получение списка реально установленных языков/раскладок в системе.
+
 - `ReportPrinter`
   - единый читаемый вывод;
   - форматы для `scan`, `dry-run`, `fix`, `restore`.
@@ -151,8 +157,11 @@ ghost-layout-fixer/
 - добавить enum команд и exit-коды.
 
 Этап 2 (read-only):
-- реализовать `scan` только на чтение;
+- реализовать `scan` только на чтение c выявлением ghost-раскладок
+  (есть в реестре, но отсутствуют в списке установленных языков);
 - оформить отчёт.
+- для локального теста без реестра/PowerShell поддержать mock-переменные:
+  `GLF_MOCK_REGISTRY_LAYOUTS` и `GLF_MOCK_INSTALLED_LAYOUTS`.
 
 Этап 3 (safe mutate):
 - реализовать `backup` и `fix --dry-run`;

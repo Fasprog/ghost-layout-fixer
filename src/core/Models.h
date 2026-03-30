@@ -9,8 +9,9 @@ namespace ghost::core
 /// @brief Результат диагностического сканирования.
 struct ScanResult
 {
-    std::vector<std::string> checkedLocations;
-    std::vector<std::string> matches;
+    std::vector<std::string> registryLayouts;
+    std::vector<std::string> installedLayouts;
+    std::vector<std::string> ghostLayouts;
     std::string status;
 };
 

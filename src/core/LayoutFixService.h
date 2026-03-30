@@ -2,6 +2,9 @@
 
 #include <src/core/Models.h>
 
+#include <string>
+#include <vector>
+
 namespace ghost::core
 {
 
@@ -9,9 +12,13 @@ namespace ghost::core
 class LayoutFixService
 {
 public:
-    /// @brief Выполняет базовое сканирование состояния.
-    /// @return Пустой результат сканирования на этапе скелета.
-    ScanResult scan() const;
+    /// @brief Выявляет призрачные раскладки из разницы реестра и установленных языков.
+    /// @param[in] registryLayouts Коды раскладок, найденные в реестре.
+    /// @param[in] installedLayouts Коды реально установленных раскладок.
+    /// @return Результат сканирования с перечнем ghost-раскладок.
+    ScanResult scan(
+        const std::vector<std::string>& registryLayouts,
+        const std::vector<std::string>& installedLayouts) const;
 };
 
 } // namespace ghost::core

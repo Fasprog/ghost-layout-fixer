@@ -16,6 +16,7 @@ add_executable(ghost-layout-fixer
     src/platform/src/RegistryService.cpp
     src/platform/src/SystemCommandRunner.cpp
     src/platform/src/PrivilegeService.cpp
+    src/platform/src/InstalledLanguageService.cpp
     src/report/src/ReportPrinter.cpp
     src/common/src/Logger.cpp
 )

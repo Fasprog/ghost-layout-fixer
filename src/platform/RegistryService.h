@@ -22,6 +22,10 @@ public:
     /// @param[in] layoutCode Код раскладки (например, en-GB).
     /// @return Список совпадений в реестре.
     std::vector<RegistryMatch> findLayoutMatches(const std::string& layoutCode) const;
+
+    /// @brief Получает все коды раскладок, найденные в реестре.
+    /// @return Список кодов раскладок из whitelist-веток.
+    std::vector<std::string> listLayoutCodesFromRegistry() const;
 };
 
 } // namespace ghost::platform
