@@ -57,12 +57,6 @@ namespace ghost::platform
 
 std::vector<std::string> InstalledLanguageService::listInstalledLayoutCodes() const
 {
-    const char* mockLayouts = std::getenv("GLF_MOCK_INSTALLED_LAYOUTS");
-    if (mockLayouts != nullptr)
-    {
-        return splitCsv(mockLayouts);
-    }
-
     const SystemCommandRunner runner;
     const CommandResult result = runner.run(
         "powershell -NoProfile -Command \"(Get-WinUserLanguageList).LanguageTag\"");

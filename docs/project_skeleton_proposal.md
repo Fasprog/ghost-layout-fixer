@@ -160,14 +160,14 @@ ghost-layout-fixer/
 - реализовать `scan` только на чтение c выявлением ghost-раскладок
   (есть в реестре, но отсутствуют в списке установленных языков);
 - оформить отчёт.
-- для локального теста без реестра/PowerShell поддержать mock-переменные:
-  `GLF_MOCK_REGISTRY_LAYOUTS` и `GLF_MOCK_INSTALLED_LAYOUTS`.
 
 Этап 3 (safe mutate):
 - реализовать `backup` и `fix --dry-run`;
-- затем реальный `fix` с confirm + backup.
 
-Этап 4 (restore + polish):
+Этап 4 (fix):
+- реализовать реальный `fix` с confirm + backup.
+
+Этап 5 (restore + polish):
 - `restore --file`;
 - доработка сообщений, кодов возврата и тестов.
 

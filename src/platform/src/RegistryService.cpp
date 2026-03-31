@@ -153,12 +153,6 @@ std::vector<RegistryMatch> RegistryService::findLayoutMatches(const std::string&
 
 std::vector<std::string> RegistryService::listLayoutCodesFromRegistry() const
 {
-    const char* mockLayouts = std::getenv("GLF_MOCK_REGISTRY_LAYOUTS");
-    if (mockLayouts != nullptr)
-    {
-        return splitCsv(mockLayouts);
-    }
-
     const std::vector<RegistrySnapshot> snapshots = readRegistrySnapshots();
     std::unordered_set<std::string> uniqueLayouts;
     for (const RegistrySnapshot& snapshot : snapshots)
