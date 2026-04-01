@@ -2,6 +2,7 @@
 
 #include <optional>
 #include <string>
+#include <vector>
 
 namespace ghost::cli
 {
@@ -24,6 +25,8 @@ struct CliOptions
     bool dryRun{false};
     std::optional<std::string> restoreFile;
     bool assumeYes{false};
+    bool showHelp{false};
+    std::vector<std::string> parseErrors;
 };
 
 } // namespace ghost::cli

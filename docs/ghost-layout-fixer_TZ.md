@@ -215,12 +215,20 @@ Ghost Layout Fixer
 
 ## 8.1 Поддерживаемые команды
 ```bash
+ghost-layout-fixer --help
+ghost-layout-fixer -h
 ghost-layout-fixer scan
 ghost-layout-fixer fix --layout en-GB
 ghost-layout-fixer fix --layout en-GB --dry-run
 ghost-layout-fixer backup
 ghost-layout-fixer restore --file backup.reg
 ```
+
+## 8.1.1 Поведение help
+- Команда `--help` и `-h` всегда выводит примеры запуска.
+- При любой ошибке в аргументах (неизвестная команда, неизвестный флаг, пропущенное значение после `--layout` или `--file`) утилита должна:
+  1. вывести понятную ошибку;
+  2. сразу вывести help с примерами корректного запуска.
 
 ## 8.2 Требования к сообщениям
 Сообщения должны быть:
