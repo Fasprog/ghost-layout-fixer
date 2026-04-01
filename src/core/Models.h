@@ -29,4 +29,13 @@ struct FixReport
     std::string backupPath;
 };
 
+/// @brief Отчёт о создании backup.
+struct BackupReport
+{
+    bool success{false};
+    std::string backupPath;
+    std::vector<std::string> executedCommands;
+    std::vector<std::string> errors;
+};
+
 } // namespace ghost::core

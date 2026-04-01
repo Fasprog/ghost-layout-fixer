@@ -12,6 +12,7 @@ include(cmake/warnings.cmake)
 add_executable(ghost-layout-fixer
     src/main.cpp
     src/cli/src/CliParser.cpp
+    src/core/src/BackupService.cpp
     src/core/src/LayoutFixService.cpp
     src/platform/src/RegistryService.cpp
     src/platform/src/SystemCommandRunner.cpp

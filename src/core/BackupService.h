@@ -1,0 +1,23 @@
+#pragma once
+
+#include <src/core/Models.h>
+
+#include <string>
+
+namespace ghost::core
+{
+
+/// @brief Создаёт backup whitelist-веток реестра для безопасных операций.
+class BackupService
+{
+public:
+    /// @brief Генерирует имя backup-файла в рабочей директории.
+    std::string makeBackupPath() const;
+
+    /// @brief Выполняет экспорт реестра в backup-файл.
+    /// @param[in] backupPath Путь до целевого .reg файла.
+    /// @return Отчёт о выполнении backup-команд.
+    BackupReport createBackup(const std::string& backupPath) const;
+};
+
+} // namespace ghost::core
