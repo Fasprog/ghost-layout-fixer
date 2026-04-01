@@ -90,4 +90,30 @@ ScanResult LayoutFixService::scan(
     return result;
 }
 
+FixPlan LayoutFixService::buildDryRunPlan(
+    const std::string& layoutCode,
+    const std::vector<std::string>& registryMatchSummaries,
+    const std::string& backupPath) const
+{
+    FixPlan plan;
+    plan.plannedSteps.push_back("validate privileges and input arguments");
+    plan.plannedSteps.push_back("create registry backup: " + backupPath);
+    plan.plannedSteps.push_back("try standard add/remove cycle for layout: " + layoutCode);
+
+    if (registryMatchSummaries.empty())
+    {
+        plan.plannedSteps.push_back("registry cleanup skipped: no matches for " + layoutCode);
+    }
+    else
+    {
+        for (const std::string& matchSummary : registryMatchSummaries)
+        {
+            plan.plannedSteps.push_back("remove registry value: " + matchSummary);
+        }
+    }
+
+    plan.plannedSteps.push_back("run scan again to verify ghost layout state");
+    return plan;
+}
+
 } // namespace ghost::core

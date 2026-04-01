@@ -20,6 +20,12 @@ public:
     ScanResult scan(
         const std::vector<std::string>& registryLayouts,
         const std::vector<std::string>& installedLayouts) const;
+
+    /// @brief Формирует безопасный план fix для режима --dry-run.
+    FixPlan buildDryRunPlan(
+        const std::string& layoutCode,
+        const std::vector<std::string>& registryMatchSummaries,
+        const std::string& backupPath) const;
 };
 
 } // namespace ghost::core
