@@ -45,6 +45,18 @@ std::vector<std::string> toMatchSummaries(const std::vector<ghost::platform::Reg
     return summaries;
 }
 
+void printHelp(const ghost::report::ReportPrinter& printer)
+{
+    printer.print("ghost-layout-fixer usage:");
+    printer.print("  ghost-layout-fixer --help");
+    printer.print("  ghost-layout-fixer -h");
+    printer.print("  ghost-layout-fixer scan");
+    printer.print("  ghost-layout-fixer backup");
+    printer.print("  ghost-layout-fixer fix --layout en-GB --dry-run");
+    printer.print("  ghost-layout-fixer fix --layout en-GB");
+    printer.print("  ghost-layout-fixer restore --file C:\\path\\backup.reg");
+}
+
 int handleScan(
     const ghost::platform::RegistryService& registryService,
     const ghost::platform::InstalledLanguageService& installedLanguageService,
@@ -98,6 +110,7 @@ int handleFixDryRun(
     if (!options.layoutCode.has_value())
     {
         printer.print("fix --dry-run requires --layout");
+        printHelp(printer);
         return static_cast<int>(ghost::core::ExitCode::GeneralError);
     }
 
@@ -124,9 +137,26 @@ int main(int argc, const char* const argv[])
     const ghost::cli::CliOptions options = parser.parse(argc, argv);
 
     const ghost::report::ReportPrinter printer;
+    if (options.showHelp)
+    {
+        printHelp(printer);
+        return static_cast<int>(ghost::core::ExitCode::Success);
+    }
+
+    if (!options.parseErrors.empty())
+    {
+        for (const std::string& error : options.parseErrors)
+        {
+            printer.print("[error] " + error);
+        }
+        printHelp(printer);
+        return static_cast<int>(ghost::core::ExitCode::GeneralError);
+    }
+
     if (options.command == ghost::cli::CommandType::Unknown)
     {
-        printer.print("ghost-layout-fixer skeleton: command is not implemented yet");
+        printer.print("[error] command is not implemented");
+        printHelp(printer);
         return static_cast<int>(ghost::core::ExitCode::GeneralError);
     }
 
