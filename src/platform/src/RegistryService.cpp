@@ -14,6 +14,7 @@ namespace
 struct RegistrySnapshot
 {
     std::string location;
+    std::string branchPath;
     std::string valueName;
     std::string valueData;
     std::string layoutCode;
@@ -78,7 +79,10 @@ std::vector<std::pair<std::string, std::string>> registryBranches()
     };
 }
 
-std::vector<RegistrySnapshot> parseRegistryEntries(const std::string& regOutput, const std::string& location)
+std::vector<RegistrySnapshot> parseRegistryEntries(
+    const std::string& regOutput,
+    const std::string& location,
+    const std::string& branchPath)
 {
     std::vector<RegistrySnapshot> entries;
     std::stringstream stream(regOutput);
@@ -101,6 +105,7 @@ std::vector<RegistrySnapshot> parseRegistryEntries(const std::string& regOutput,
 
         RegistrySnapshot snapshot;
         snapshot.location = location;
+        snapshot.branchPath = branchPath;
         snapshot.valueName = valueName;
         snapshot.valueData = valueData;
         snapshot.layoutCode = layoutCode;
@@ -118,7 +123,8 @@ std::vector<RegistrySnapshot> readRegistrySnapshots()
     for (const auto& [locationAlias, branchPath] : registryBranches())
     {
         const ghost::platform::CommandResult query = runner.run("reg query \"" + branchPath + "\"");
-        const std::vector<RegistrySnapshot> parsed = parseRegistryEntries(query.stdoutText, locationAlias);
+        const std::vector<RegistrySnapshot> parsed =
+            parseRegistryEntries(query.stdoutText, locationAlias, branchPath);
         snapshots.insert(snapshots.end(), parsed.begin(), parsed.end());
     }
 
@@ -143,6 +149,7 @@ std::vector<RegistryMatch> RegistryService::findLayoutMatches(const std::string&
 
         RegistryMatch match;
         match.location = snapshot.location;
+        match.branchPath = snapshot.branchPath;
         match.valueName = snapshot.valueName;
         match.valueData = snapshot.valueData;
         matches.push_back(match);
@@ -161,6 +168,25 @@ std::vector<std::string> RegistryService::listLayoutCodesFromRegistry() const
     }
 
     return std::vector<std::string>(uniqueLayouts.begin(), uniqueLayouts.end());
+}
+
+std::vector<std::string> RegistryService::deleteMatches(const std::vector<RegistryMatch>& matches) const
+{
+    const ghost::platform::SystemCommandRunner runner;
+    std::vector<std::string> errors;
+
+    for (const RegistryMatch& match : matches)
+    {
+        const std::string command =
+            "reg delete \"" + match.branchPath + "\" /v \"" + match.valueName + "\" /f";
+        const ghost::platform::CommandResult result = runner.run(command);
+        if (result.exitCode != 0)
+        {
+            errors.push_back("failed to delete " + match.branchPath + "\\" + match.valueName + ": " + result.stdoutText);
+        }
+    }
+
+    return errors;
 }
 
 } // namespace ghost::platform

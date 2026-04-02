@@ -27,6 +27,7 @@ struct FixReport
     std::vector<std::string> executedSteps;
     std::vector<std::string> errors;
     std::string backupPath;
+    bool success{false};
 };
 
 /// @brief Отчёт о создании backup.

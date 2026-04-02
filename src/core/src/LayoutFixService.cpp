@@ -1,5 +1,7 @@
 #include <src/core/LayoutFixService.h>
 
+#include <src/platform/SystemCommandRunner.h>
+
 #include <algorithm>
 #include <cctype>
 #include <unordered_set>
@@ -114,6 +116,48 @@ FixPlan LayoutFixService::buildDryRunPlan(
 
     plan.plannedSteps.push_back("run scan again to verify ghost layout state");
     return plan;
+}
+
+FixReport LayoutFixService::executeFix(
+    const std::string& layoutCode,
+    const std::vector<ghost::platform::RegistryMatch>& matches,
+    const std::string& backupPath,
+    const ghost::platform::RegistryService& registryService) const
+{
+    const ghost::platform::SystemCommandRunner runner;
+    FixReport report;
+    report.backupPath = backupPath;
+    report.executedSteps.push_back("backup created: " + backupPath);
+
+    const std::string addCommand =
+        "powershell -NoProfile -Command \"$list = Get-WinUserLanguageList; "
+        "if (-not ($list.LanguageTag -contains '" +
+        layoutCode + "')) { $list.Add('" + layoutCode +
+        "'); Set-WinUserLanguageList $list -Force }\"";
+    const ghost::platform::CommandResult addResult = runner.run(addCommand);
+    report.executedSteps.push_back("standard add command: " + addCommand);
+    if (addResult.exitCode != 0)
+    {
+        report.errors.push_back("standard add failed: " + addResult.stdoutText);
+    }
+
+    const std::string removeCommand =
+        "powershell -NoProfile -Command \"$list = Get-WinUserLanguageList; "
+        "$filtered = @($list | Where-Object { $_.LanguageTag -ne '" +
+        layoutCode + "' }); Set-WinUserLanguageList $filtered -Force\"";
+    const ghost::platform::CommandResult removeResult = runner.run(removeCommand);
+    report.executedSteps.push_back("standard remove command: " + removeCommand);
+    if (removeResult.exitCode != 0)
+    {
+        report.errors.push_back("standard remove failed: " + removeResult.stdoutText);
+    }
+
+    report.executedSteps.push_back("registry cleanup matches: " + std::to_string(matches.size()));
+    const std::vector<std::string> cleanupErrors = registryService.deleteMatches(matches);
+    report.errors.insert(report.errors.end(), cleanupErrors.begin(), cleanupErrors.end());
+
+    report.success = report.errors.empty();
+    return report;
 }
 
 } // namespace ghost::core
