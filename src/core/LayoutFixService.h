@@ -1,6 +1,7 @@
 #pragma once
 
 #include <src/core/Models.h>
+#include <src/platform/RegistryService.h>
 
 #include <string>
 #include <vector>
@@ -26,6 +27,18 @@ public:
         const std::string& layoutCode,
         const std::vector<std::string>& registryMatchSummaries,
         const std::string& backupPath) const;
+
+    /// @brief Выполняет реальный fix: add/remove cycle + cleanup следов в реестре.
+    /// @param[in] layoutCode Целевая раскладка.
+    /// @param[in] matches Совпадения, подлежащие удалению.
+    /// @param[in] backupPath Путь к уже созданному backup.
+    /// @param[in] registryService Сервис удаления совпадений.
+    /// @return Итоговый отчёт фиксации.
+    FixReport executeFix(
+        const std::string& layoutCode,
+        const std::vector<ghost::platform::RegistryMatch>& matches,
+        const std::string& backupPath,
+        const ghost::platform::RegistryService& registryService) const;
 };
 
 } // namespace ghost::core

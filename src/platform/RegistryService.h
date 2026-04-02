@@ -10,6 +10,7 @@ namespace ghost::platform
 struct RegistryMatch
 {
     std::string location;
+    std::string branchPath;
     std::string valueName;
     std::string valueData;
 };
@@ -26,6 +27,11 @@ public:
     /// @brief Получает все коды раскладок, найденные в реестре.
     /// @return Список кодов раскладок из whitelist-веток.
     std::vector<std::string> listLayoutCodesFromRegistry() const;
+
+    /// @brief Удаляет найденные совпадения по значениям в реестре.
+    /// @param[in] matches Совпадения, которые требуется удалить.
+    /// @return Ошибки удаления (пусто при полном успехе).
+    std::vector<std::string> deleteMatches(const std::vector<RegistryMatch>& matches) const;
 };
 
 } // namespace ghost::platform

@@ -129,6 +129,71 @@ int handleFixDryRun(
     return static_cast<int>(ghost::core::ExitCode::Success);
 }
 
+int handleFix(
+    const ghost::cli::CliOptions& options,
+    const ghost::core::BackupService& backupService,
+    const ghost::platform::RegistryService& registryService,
+    const ghost::platform::InstalledLanguageService& installedLanguageService,
+    const ghost::core::LayoutFixService& layoutFixService,
+    const ghost::report::ReportPrinter& printer)
+{
+    if (!options.layoutCode.has_value())
+    {
+        printer.print("fix requires --layout");
+        printHelp(printer);
+        return static_cast<int>(ghost::core::ExitCode::GeneralError);
+    }
+
+    if (*options.layoutCode != "en-GB")
+    {
+        printer.print("only en-GB is supported in MVP");
+        return static_cast<int>(ghost::core::ExitCode::GeneralError);
+    }
+
+    const std::string backupPath = backupService.makeBackupPath();
+    const ghost::core::BackupReport backupReport = backupService.createBackup(backupPath);
+    for (const std::string& command : backupReport.executedCommands)
+    {
+        printer.print("[fix] backup command: " + command);
+    }
+
+    if (!backupReport.success)
+    {
+        for (const std::string& error : backupReport.errors)
+        {
+            printer.print("[fix] backup error: " + error);
+        }
+        return static_cast<int>(ghost::core::ExitCode::BackupError);
+    }
+
+    const std::vector<ghost::platform::RegistryMatch> matches =
+        registryService.findLayoutMatches(*options.layoutCode);
+    const ghost::core::FixReport fixReport =
+        layoutFixService.executeFix(*options.layoutCode, matches, backupPath, registryService);
+
+    for (const std::string& step : fixReport.executedSteps)
+    {
+        printer.print("[fix] step: " + step);
+    }
+    for (const std::string& error : fixReport.errors)
+    {
+        printer.print("[fix] error: " + error);
+    }
+
+    const std::vector<std::string> registryLayouts = registryService.listLayoutCodesFromRegistry();
+    const std::vector<std::string> installedLayouts = installedLanguageService.listInstalledLayoutCodes();
+    const ghost::core::ScanResult scanResult = layoutFixService.scan(registryLayouts, installedLayouts);
+    printer.print("[fix] post-scan ghost layouts: " + joinLayouts(scanResult.ghostLayouts));
+    printer.print("[fix] recommendation: reboot or sign out to apply language switcher state");
+
+    if (!fixReport.success)
+    {
+        return static_cast<int>(ghost::core::ExitCode::FixError);
+    }
+
+    return static_cast<int>(ghost::core::ExitCode::Success);
+}
+
 } // namespace
 
 int main(int argc, const char* const argv[])
@@ -171,6 +236,7 @@ int main(int argc, const char* const argv[])
     const ghost::platform::PrivilegeService privilegeService;
     const ghost::core::BackupService backupService;
     const ghost::platform::RegistryService registryService;
+    const ghost::platform::InstalledLanguageService installedLanguageService;
     const ghost::core::LayoutFixService layoutFixService;
 
     if (!privilegeService.isRunningAsAdmin())
@@ -187,6 +253,17 @@ int main(int argc, const char* const argv[])
     if (options.command == ghost::cli::CommandType::Fix && options.dryRun)
     {
         return handleFixDryRun(options, backupService, registryService, layoutFixService, printer);
+    }
+
+    if (options.command == ghost::cli::CommandType::Fix)
+    {
+        return handleFix(
+            options,
+            backupService,
+            registryService,
+            installedLanguageService,
+            layoutFixService,
+            printer);
     }
 
     printer.print("command is recognized but not implemented in this stage");
