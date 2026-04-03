@@ -194,6 +194,37 @@ int handleFix(
     return static_cast<int>(ghost::core::ExitCode::Success);
 }
 
+int handleRestore(
+    const ghost::cli::CliOptions& options,
+    const ghost::core::BackupService& backupService,
+    const ghost::report::ReportPrinter& printer)
+{
+    if (!options.restoreFile.has_value())
+    {
+        printer.print("restore requires --file");
+        printHelp(printer);
+        return static_cast<int>(ghost::core::ExitCode::GeneralError);
+    }
+
+    const ghost::core::RestoreReport restoreReport = backupService.restoreBackup(*options.restoreFile);
+    for (const std::string& command : restoreReport.executedCommands)
+    {
+        printer.print("[restore] command: " + command);
+    }
+    for (const std::string& error : restoreReport.errors)
+    {
+        printer.print("[restore] error: " + error);
+    }
+
+    if (!restoreReport.success)
+    {
+        return static_cast<int>(ghost::core::ExitCode::RestoreError);
+    }
+
+    printer.print("[restore] restored from: " + restoreReport.sourcePath);
+    return static_cast<int>(ghost::core::ExitCode::Success);
+}
+
 } // namespace
 
 int main(int argc, const char* const argv[])
@@ -266,6 +297,11 @@ int main(int argc, const char* const argv[])
             printer);
     }
 
-    printer.print("command is recognized but not implemented in this stage");
+    if (options.command == ghost::cli::CommandType::Restore)
+    {
+        return handleRestore(options, backupService, printer);
+    }
+
+    printer.print("[error] command is not supported");
     return static_cast<int>(ghost::core::ExitCode::GeneralError);
 }

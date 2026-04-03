@@ -30,5 +30,17 @@ glf_apply_warnings(ghost-layout-fixer)
 
 if(BUILD_TESTS)
     enable_testing()
-    message(STATUS "BUILD_TESTS is ON, test targets will be added in later stages")
+    add_executable(ghost-layout-fixer-tests
+        src/cli/src/CliParser.cpp
+        src/core/src/BackupService.cpp
+        src/core/src/LayoutFixService.cpp
+        src/platform/src/RegistryService.cpp
+        src/platform/src/SystemCommandRunner.cpp
+        tests/commands/CommandWorkflowTests.cpp
+    )
+    target_include_directories(ghost-layout-fixer-tests PRIVATE
+        ${CMAKE_SOURCE_DIR}
+    )
+    glf_apply_warnings(ghost-layout-fixer-tests)
+    add_test(NAME ghost-layout-fixer-tests COMMAND ghost-layout-fixer-tests)
 endif()
