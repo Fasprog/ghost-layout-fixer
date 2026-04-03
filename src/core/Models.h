@@ -39,4 +39,13 @@ struct BackupReport
     std::vector<std::string> errors;
 };
 
+/// @brief Отчёт о восстановлении backup.
+struct RestoreReport
+{
+    bool success{false};
+    std::string sourcePath;
+    std::vector<std::string> executedCommands;
+    std::vector<std::string> errors;
+};
+
 } // namespace ghost::core
