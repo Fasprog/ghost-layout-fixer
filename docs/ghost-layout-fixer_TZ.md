@@ -12,8 +12,8 @@ Ghost Layout Fixer
 - могут возвращаться после перезагрузки.
 
 ### 1.3 Основной сценарий
-Первый поддерживаемый сценарий:
-- в системе присутствует фантомная раскладка `English (United Kingdom)` / `en-GB`;
+Поддерживаемый сценарий:
+- в системе присутствует фантомная раскладка любого поддерживаемого языка Windows (например, `English (United Kingdom)` / `en-GB` или `Spanish (Spain)` / `es-ES`);
 - пользователь хочет удалить её штатно и дочистить остатки в реестре.
 
 ---
@@ -65,7 +65,7 @@ Ghost Layout Fixer
 
 ## 3.2 Команда `fix --layout <code>`
 Для MVP обязательно поддержать:
-- `en-GB`
+- любые основные языковые теги Windows в формате BCP-47 (например, `en-GB`, `es-ES`, `fr-FR`, `de-DE`).
 
 Команда должна:
 1. проверить права запуска;
@@ -218,8 +218,8 @@ Ghost Layout Fixer
 ghost-layout-fixer --help
 ghost-layout-fixer -h
 ghost-layout-fixer scan
-ghost-layout-fixer fix --layout en-GB
-ghost-layout-fixer fix --layout en-GB --dry-run
+ghost-layout-fixer fix --layout <language-tag>
+ghost-layout-fixer fix --layout <language-tag> --dry-run
 ghost-layout-fixer backup
 ghost-layout-fixer restore --file backup.reg
 ```
@@ -258,13 +258,13 @@ ghost-layout-fixer restore --file backup.reg
 3. создание backup;
 4. корректную обработку отсутствующих ключей;
 5. защиту от запуска без прав;
-6. корректную обработку неподдерживаемой раскладки.
+6. корректную обработку корректных и некорректных кодов раскладки (`--layout <language-tag>`).
 
 ## 10.2 Ручной сценарий приёмки
-1. на тестовой системе воспроизвести кейс с `en-GB`;
+1. на тестовой системе воспроизвести кейс с фантомной раскладкой выбранного языка (например, `en-GB` или `es-ES`);
 2. выполнить `scan`;
-3. выполнить `fix --layout en-GB --dry-run`;
-4. выполнить `fix --layout en-GB`;
+3. выполнить `fix --layout <language-tag> --dry-run`;
+4. выполнить `fix --layout <language-tag>`;
 5. перезагрузить систему;
 6. убедиться, что фантомная раскладка не вернулась;
 7. при необходимости проверить `restore`.
@@ -277,14 +277,13 @@ ghost-layout-fixer restore --file backup.reg
 - команды работают по ТЗ;
 - backup создаётся до изменений;
 - dry-run ничего не меняет;
-- целевой кейс с фантомным `en-GB` исправляется на тестовой машине;
+- целевой кейс с фантомной раскладкой выбранного языка исправляется на тестовой машине;
 - итоговый отчёт понятен пользователю.
 
 ---
 
 ## 12. Post-MVP
 После MVP можно добавить:
-- поддержку нескольких раскладок;
 - конфиг с белым списком кодов;
 - JSON-отчёты;
 - unit-тесты на внутреннюю логику;

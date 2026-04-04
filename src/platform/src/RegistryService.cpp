@@ -20,40 +20,6 @@ struct RegistrySnapshot
     std::string layoutCode;
 };
 
-std::vector<std::string> splitCsv(const std::string& csv)
-{
-    std::vector<std::string> result;
-    std::stringstream stream(csv);
-    std::string part;
-    while (std::getline(stream, part, ','))
-    {
-        if (!part.empty())
-        {
-            result.push_back(part);
-        }
-    }
-
-    return result;
-}
-
-std::string hklToLayoutCode(const std::string& hkl)
-{
-    static const std::unordered_map<std::string, std::string> mapping = {
-        {"00000409", "en-US"},
-        {"00000809", "en-GB"},
-        {"00000419", "ru-RU"},
-        {"00000422", "uk-UA"}
-    };
-
-    const auto found = mapping.find(hkl);
-    if (found == mapping.end())
-    {
-        return {};
-    }
-
-    return found->second;
-}
-
 std::string trimWhitespace(const std::string& value)
 {
     std::string trimmed;
@@ -66,6 +32,62 @@ std::string trimWhitespace(const std::string& value)
     }
 
     return trimmed;
+}
+
+std::unordered_map<std::string, std::string> buildLcidToLanguageTagMap()
+{
+    const ghost::platform::SystemCommandRunner runner;
+    const ghost::platform::CommandResult result = runner.run(
+        "powershell -NoProfile -Command \"[System.Globalization.CultureInfo]::GetCultures([System.Globalization.CultureTypes]::SpecificCultures) | ForEach-Object { '{0:X4}={1}' -f $_.LCID, $_.Name }\"");
+
+    std::unordered_map<std::string, std::string> mapping;
+    if (result.exitCode != 0)
+    {
+        return mapping;
+    }
+
+    std::stringstream stream(result.stdoutText);
+    std::string line;
+    while (std::getline(stream, line))
+    {
+        const std::size_t separatorPos = line.find('=');
+        if (separatorPos == std::string::npos || separatorPos == 0 || separatorPos + 1 >= line.size())
+        {
+            continue;
+        }
+
+        const std::string lcidHex = trimWhitespace(line.substr(0, separatorPos));
+        const std::string languageTag = trimWhitespace(line.substr(separatorPos + 1));
+        if (!lcidHex.empty() && !languageTag.empty())
+        {
+            mapping[lcidHex] = languageTag;
+        }
+    }
+
+    return mapping;
+}
+
+std::string extractLanguageIdHex(const std::string& hkl)
+{
+    if (hkl.size() < 4)
+    {
+        return {};
+    }
+
+    return hkl.substr(hkl.size() - 4);
+}
+
+std::string hklToLayoutCode(const std::string& hkl)
+{
+    static const std::unordered_map<std::string, std::string> lcidMapping = buildLcidToLanguageTagMap();
+    const std::string lcidHex = extractLanguageIdHex(hkl);
+    const auto found = lcidMapping.find(lcidHex);
+    if (found == lcidMapping.end())
+    {
+        return {};
+    }
+
+    return found->second;
 }
 
 std::vector<std::pair<std::string, std::string>> registryBranches()
