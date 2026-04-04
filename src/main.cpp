@@ -52,8 +52,8 @@ void printHelp(const ghost::report::ReportPrinter& printer)
     printer.print("  ghost-layout-fixer -h");
     printer.print("  ghost-layout-fixer scan");
     printer.print("  ghost-layout-fixer backup");
-    printer.print("  ghost-layout-fixer fix --layout en-GB --dry-run");
-    printer.print("  ghost-layout-fixer fix --layout en-GB");
+    printer.print("  ghost-layout-fixer fix --layout <language-tag> --dry-run");
+    printer.print("  ghost-layout-fixer fix --layout <language-tag>");
     printer.print("  ghost-layout-fixer restore --file C:\\path\\backup.reg");
 }
 
@@ -141,12 +141,6 @@ int handleFix(
     {
         printer.print("fix requires --layout");
         printHelp(printer);
-        return static_cast<int>(ghost::core::ExitCode::GeneralError);
-    }
-
-    if (*options.layoutCode != "en-GB")
-    {
-        printer.print("only en-GB is supported in MVP");
         return static_cast<int>(ghost::core::ExitCode::GeneralError);
     }
 

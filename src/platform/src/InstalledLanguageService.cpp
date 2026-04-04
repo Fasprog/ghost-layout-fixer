@@ -9,22 +9,6 @@
 namespace
 {
 
-std::vector<std::string> splitCsv(const std::string& csv)
-{
-    std::vector<std::string> result;
-    std::stringstream stream(csv);
-    std::string part;
-    while (std::getline(stream, part, ','))
-    {
-        if (!part.empty())
-        {
-            result.push_back(part);
-        }
-    }
-
-    return result;
-}
-
 std::vector<std::string> parseLanguageTags(const std::string& output)
 {
     std::unordered_set<std::string> uniqueTags;

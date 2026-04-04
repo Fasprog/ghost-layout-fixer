@@ -102,7 +102,7 @@ ghost-layout-fixer/
 
 - `CliParser`
   - валидация команд и флагов;
-  - поддержка только `en-GB` на этапе MVP.
+  - поддержка `--layout <language-tag>` для любых поддерживаемых языков Windows.
 
 - `LayoutFixService`
   - orchestration сценариев `scan/fix/backup/restore`;
@@ -181,5 +181,4 @@ ghost-layout-fixer/
 
 ## 10) Что НЕ делаем сейчас
 - Не реализуем фактическое изменение реестра.
-- Не добавляем GUI/сервис/автозапуск.
-- Не расширяем поддержку beyond `en-GB` до завершения MVP.
+- Не добавляем GUI/сервис/автозапуск в рамках MVP.
