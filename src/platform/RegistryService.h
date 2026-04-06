@@ -1,5 +1,7 @@
 #pragma once
 
+#include <src/platform/SystemCommandRunner.h>
+
 #include <string>
 #include <vector>
 
@@ -19,6 +21,8 @@ struct RegistryMatch
 class RegistryService
 {
 public:
+    explicit RegistryService(const ICommandRunner* runner = nullptr);
+
     /// @brief Ищет совпадения по коду раскладки.
     /// @param[in] layoutCode Код раскладки (например, en-GB).
     /// @return Список совпадений в реестре.
@@ -32,6 +36,9 @@ public:
     /// @param[in] matches Совпадения, которые требуется удалить.
     /// @return Ошибки удаления (пусто при полном успехе).
     std::vector<std::string> deleteMatches(const std::vector<RegistryMatch>& matches) const;
+
+private:
+    const ICommandRunner* runner_;
 };
 
 } // namespace ghost::platform

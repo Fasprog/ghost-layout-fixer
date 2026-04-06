@@ -8,6 +8,11 @@
 
 namespace
 {
+const ghost::platform::ICommandRunner& defaultRunner()
+{
+    static const ghost::platform::SystemCommandRunner runner;
+    return runner;
+}
 
 std::string normalizeCode(const std::string& code)
 {
@@ -55,6 +60,10 @@ bool isInstalled(
 
 namespace ghost::core
 {
+LayoutFixService::LayoutFixService(const ghost::platform::ICommandRunner* runner)
+    : runner_(runner != nullptr ? runner : &defaultRunner())
+{
+}
 
 ScanResult LayoutFixService::scan(
     const std::vector<std::string>& registryLayouts,
@@ -124,7 +133,7 @@ FixReport LayoutFixService::executeFix(
     const std::string& backupPath,
     const ghost::platform::RegistryService& registryService) const
 {
-    const ghost::platform::SystemCommandRunner runner;
+     
     FixReport report;
     report.backupPath = backupPath;
     report.executedSteps.push_back("backup created: " + backupPath);
@@ -134,22 +143,22 @@ FixReport LayoutFixService::executeFix(
         "if (-not ($list.LanguageTag -contains '" +
         layoutCode + "')) { $list.Add('" + layoutCode +
         "'); Set-WinUserLanguageList $list -Force }\"";
-    const ghost::platform::CommandResult addResult = runner.run(addCommand);
+    const ghost::platform::CommandResult addResult = runner_->run(addCommand);
     report.executedSteps.push_back("standard add command: " + addCommand);
     if (addResult.exitCode != 0)
     {
-        report.errors.push_back("standard add failed: " + addResult.stdoutText);
+        report.errors.push_back("standard add failed: " + addResult.outputText);
     }
 
     const std::string removeCommand =
         "powershell -NoProfile -Command \"$list = Get-WinUserLanguageList; "
         "$filtered = @($list | Where-Object { $_.LanguageTag -ne '" +
         layoutCode + "' }); Set-WinUserLanguageList $filtered -Force\"";
-    const ghost::platform::CommandResult removeResult = runner.run(removeCommand);
+    const ghost::platform::CommandResult removeResult = runner_->run(removeCommand);
     report.executedSteps.push_back("standard remove command: " + removeCommand);
     if (removeResult.exitCode != 0)
     {
-        report.errors.push_back("standard remove failed: " + removeResult.stdoutText);
+        report.errors.push_back("standard remove failed: " + removeResult.outputText);
     }
 
     report.executedSteps.push_back("registry cleanup matches: " + std::to_string(matches.size()));

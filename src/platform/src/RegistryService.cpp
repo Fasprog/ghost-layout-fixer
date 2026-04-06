@@ -2,7 +2,6 @@
 
 #include <src/platform/SystemCommandRunner.h>
 
-#include <cstdlib>
 #include <sstream>
 #include <string_view>
 #include <unordered_map>
@@ -20,6 +19,12 @@ struct RegistrySnapshot
     std::string layoutCode;
 };
 
+const ghost::platform::ICommandRunner& defaultRunner()
+{
+    static const ghost::platform::SystemCommandRunner runner;
+    return runner;
+}
+
 std::string trimWhitespace(const std::string& value)
 {
     std::string trimmed;
@@ -34,9 +39,9 @@ std::string trimWhitespace(const std::string& value)
     return trimmed;
 }
 
-std::unordered_map<std::string, std::string> buildLcidToLanguageTagMap()
+std::unordered_map<std::string, std::string>
+buildLcidToLanguageTagMap(const ghost::platform::ICommandRunner& runner)
 {
-    const ghost::platform::SystemCommandRunner runner;
     const ghost::platform::CommandResult result = runner.run(
         "powershell -NoProfile -Command \"[System.Globalization.CultureInfo]::GetCultures([System.Globalization.CultureTypes]::SpecificCultures) | ForEach-Object { '{0:X4}={1}' -f $_.LCID, $_.Name }\"");
 
@@ -46,7 +51,7 @@ std::unordered_map<std::string, std::string> buildLcidToLanguageTagMap()
         return mapping;
     }
 
-    std::stringstream stream(result.stdoutText);
+    std::stringstream stream(result.outputText);
     std::string line;
     while (std::getline(stream, line))
     {
@@ -77,9 +82,10 @@ std::string extractLanguageIdHex(const std::string& hkl)
     return hkl.substr(hkl.size() - 4);
 }
 
-std::string hklToLayoutCode(const std::string& hkl)
+std::string hklToLayoutCode(
+    const std::string& hkl,
+    const std::unordered_map<std::string, std::string>& lcidMapping)
 {
-    static const std::unordered_map<std::string, std::string> lcidMapping = buildLcidToLanguageTagMap();
     const std::string lcidHex = extractLanguageIdHex(hkl);
     const auto found = lcidMapping.find(lcidHex);
     if (found == lcidMapping.end())
@@ -104,7 +110,8 @@ std::vector<std::pair<std::string, std::string>> registryBranches()
 std::vector<RegistrySnapshot> parseRegistryEntries(
     const std::string& regOutput,
     const std::string& location,
-    const std::string& branchPath)
+    const std::string& branchPath,
+    const std::unordered_map<std::string, std::string>& lcidMapping)
 {
     std::vector<RegistrySnapshot> entries;
     std::stringstream stream(regOutput);
@@ -119,7 +126,7 @@ std::vector<RegistrySnapshot> parseRegistryEntries(
 
         const std::string valueName = trimWhitespace(line.substr(0, tokenPos));
         const std::string valueData = trimWhitespace(line.substr(tokenPos + std::string_view("REG_SZ").size()));
-        const std::string layoutCode = hklToLayoutCode(valueData);
+        const std::string layoutCode = hklToLayoutCode(valueData, lcidMapping);
         if (layoutCode.empty())
         {
             continue;
@@ -137,16 +144,25 @@ std::vector<RegistrySnapshot> parseRegistryEntries(
     return entries;
 }
 
-std::vector<RegistrySnapshot> readRegistrySnapshots()
+std::vector<RegistrySnapshot> readRegistrySnapshots(const ghost::platform::ICommandRunner& runner)
 {
-    const ghost::platform::SystemCommandRunner runner;
+    const std::unordered_map<std::string, std::string> lcidMapping = buildLcidToLanguageTagMap(runner);
     std::vector<RegistrySnapshot> snapshots;
+    if (lcidMapping.empty())
+    {
+        return snapshots;
+    }
 
     for (const auto& [locationAlias, branchPath] : registryBranches())
     {
         const ghost::platform::CommandResult query = runner.run("reg query \"" + branchPath + "\"");
+        if (query.exitCode != 0)
+        {
+            continue;
+        }
+
         const std::vector<RegistrySnapshot> parsed =
-            parseRegistryEntries(query.stdoutText, locationAlias, branchPath);
+            parseRegistryEntries(query.outputText, locationAlias, branchPath, lcidMapping);
         snapshots.insert(snapshots.end(), parsed.begin(), parsed.end());
     }
 
@@ -158,9 +174,14 @@ std::vector<RegistrySnapshot> readRegistrySnapshots()
 namespace ghost::platform
 {
 
+RegistryService::RegistryService(const ICommandRunner* runner)
+    : runner_(runner != nullptr ? runner : &defaultRunner())
+{
+}
+
 std::vector<RegistryMatch> RegistryService::findLayoutMatches(const std::string& layoutCode) const
 {
-    const std::vector<RegistrySnapshot> snapshots = readRegistrySnapshots();
+    const std::vector<RegistrySnapshot> snapshots = readRegistrySnapshots(*runner_);
     std::vector<RegistryMatch> matches;
     for (const RegistrySnapshot& snapshot : snapshots)
     {
@@ -182,7 +203,7 @@ std::vector<RegistryMatch> RegistryService::findLayoutMatches(const std::string&
 
 std::vector<std::string> RegistryService::listLayoutCodesFromRegistry() const
 {
-    const std::vector<RegistrySnapshot> snapshots = readRegistrySnapshots();
+    const std::vector<RegistrySnapshot> snapshots = readRegistrySnapshots(*runner_);
     std::unordered_set<std::string> uniqueLayouts;
     for (const RegistrySnapshot& snapshot : snapshots)
     {
@@ -194,17 +215,16 @@ std::vector<std::string> RegistryService::listLayoutCodesFromRegistry() const
 
 std::vector<std::string> RegistryService::deleteMatches(const std::vector<RegistryMatch>& matches) const
 {
-    const ghost::platform::SystemCommandRunner runner;
     std::vector<std::string> errors;
 
     for (const RegistryMatch& match : matches)
     {
         const std::string command =
             "reg delete \"" + match.branchPath + "\" /v \"" + match.valueName + "\" /f";
-        const ghost::platform::CommandResult result = runner.run(command);
+        const ghost::platform::CommandResult result = runner_->run(command);
         if (result.exitCode != 0)
         {
-            errors.push_back("failed to delete " + match.branchPath + "\\" + match.valueName + ": " + result.stdoutText);
+            errors.push_back("failed to delete " + match.branchPath + "\\" + match.valueName + ": " + result.outputText);
         }
     }
 

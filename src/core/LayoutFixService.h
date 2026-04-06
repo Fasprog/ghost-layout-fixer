@@ -2,6 +2,7 @@
 
 #include <src/core/Models.h>
 #include <src/platform/RegistryService.h>
+#include <src/platform/SystemCommandRunner.h>
 
 #include <string>
 #include <vector>
@@ -13,6 +14,8 @@ namespace ghost::core
 class LayoutFixService
 {
 public:
+    explicit LayoutFixService(const ghost::platform::ICommandRunner* runner = nullptr);
+
     /// @brief Выявляет призрачные раскладки из разницы реестра и установленных языков.
     /// При сравнении учитывает нормализацию тегов (`ru` ~= `ru-RU`).
     /// @param[in] registryLayouts Коды раскладок, найденные в реестре.
@@ -39,6 +42,9 @@ public:
         const std::vector<ghost::platform::RegistryMatch>& matches,
         const std::string& backupPath,
         const ghost::platform::RegistryService& registryService) const;
+
+private:
+    const ghost::platform::ICommandRunner* runner_;
 };
 
 } // namespace ghost::core
