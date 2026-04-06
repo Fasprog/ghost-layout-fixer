@@ -144,6 +144,14 @@ bool testBackupPartialFailure()
     bool ok = true;
     ok = expect(!report.success, "backup reports failure on partial export failure") && ok;
     ok = expect(!report.errors.empty(), "backup returns detailed export errors") && ok;
+    ok = expect(!std::filesystem::exists(backupPath), "failed backup does not leave partial merged .reg on disk") && ok;
+    bool hasLeftoverParts = false;
+    for (int index = 0; index < 6; ++index)
+    {
+        const std::filesystem::path part = backupPath.string() + ".part" + std::to_string(index) + ".reg";
+        hasLeftoverParts = hasLeftoverParts || std::filesystem::exists(part);
+    }
+    ok = expect(!hasLeftoverParts, "failed backup cleans temporary .part files") && ok;
     std::filesystem::remove(backupPath);
     return ok;
 }
@@ -165,13 +173,23 @@ bool testRestoreBackupValidationAndFailure()
     std::ofstream(existing) << "Windows Registry Editor Version 5.00\n";
     const ghost::core::RestoreReport failedImportReport = backupService.restoreBackup(existing.string());
 
+    const std::filesystem::path upperCaseExtension = std::filesystem::temp_directory_path() / "ghost-layout-fixer-existing.REG";
+    std::ofstream(upperCaseExtension) << "Windows Registry Editor Version 5.00\n";
+    const ghost::core::RestoreReport upperCaseExtensionReport = backupService.restoreBackup(upperCaseExtension.string());
+
     bool ok = true;
     ok = expect(!missingReport.success, "restore fails on missing backup") && ok;
     ok = expect(!invalidReport.success, "restore fails on invalid backup extension") && ok;
     ok = expect(!failedImportReport.success, "restore reports reg import failure") && ok;
+    ok = expect(
+             !upperCaseExtensionReport.errors.empty() &&
+                 upperCaseExtensionReport.errors.front().find("invalid extension") == std::string::npos,
+             "restore accepts .REG extension and reaches import stage") &&
+        ok;
 
     std::filesystem::remove(invalid);
     std::filesystem::remove(existing);
+    std::filesystem::remove(upperCaseExtension);
     return ok;
 }
 

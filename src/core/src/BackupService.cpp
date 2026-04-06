@@ -8,6 +8,7 @@
 #include <fstream>
 #include <iomanip>
 #include <sstream>
+#include <string_view>
 #include <vector>
 
 namespace
@@ -47,6 +48,20 @@ std::string stripRegHeader(const std::string& content)
     return content;
 }
 
+bool hasRegExtensionCaseInsensitive(const std::filesystem::path& path)
+{
+    const std::string extension = path.extension().string();
+    if (extension.size() != 4)
+    {
+        return false;
+    }
+
+    return (extension[0] == '.') &&
+           (extension[1] == 'r' || extension[1] == 'R') &&
+           (extension[2] == 'e' || extension[2] == 'E') &&
+           (extension[3] == 'g' || extension[3] == 'G');
+}
+
 } // namespace
 
 namespace ghost::core
@@ -82,6 +97,15 @@ BackupReport BackupService::createBackup(const std::string& backupPath) const
     report.backupPath = backupPath;
 
     std::vector<std::filesystem::path> exportedFiles;
+    const auto cleanupExportedFiles = [&exportedFiles]()
+    {
+        for (const std::filesystem::path& exportedFile : exportedFiles)
+        {
+            std::error_code ignore;
+            std::filesystem::remove(exportedFile, ignore);
+        }
+    };
+
     int branchIndex = 0;
     for (const std::string& branch : registryBranchesForBackup())
     {
@@ -106,6 +130,7 @@ BackupReport BackupService::createBackup(const std::string& backupPath) const
     {
         report.errors.push_back("backup failed: no registry branches were exported");
         report.success = false;
+        cleanupExportedFiles();
         return report;
     }
 
@@ -114,6 +139,7 @@ BackupReport BackupService::createBackup(const std::string& backupPath) const
     {
         report.errors.push_back("backup failed: cannot create file " + backupPath);
         report.success = false;
+        cleanupExportedFiles();
         return report;
     }
 
@@ -132,15 +158,17 @@ BackupReport BackupService::createBackup(const std::string& backupPath) const
         mergedBackup << stripRegHeader(buffer.str()) << "\r\n";
     }
 
-    for (const std::filesystem::path& exportedFile : exportedFiles)
-    {
-        std::error_code ignore;
-        std::filesystem::remove(exportedFile, ignore);
-    }
+    cleanupExportedFiles();
 
     if (!mergedBackup.good())
     {
         report.errors.push_back("backup failed: write error for " + backupPath);
+    }
+
+    if (!report.errors.empty())
+    {
+        std::error_code ignore;
+        std::filesystem::remove(backupPath, ignore);
     }
 
     report.success = report.errors.empty();
@@ -158,7 +186,7 @@ RestoreReport BackupService::restoreBackup(const std::string& backupPath) const
         return report;
     }
 
-    if (std::filesystem::path(backupPath).extension() != ".reg")
+    if (!hasRegExtensionCaseInsensitive(std::filesystem::path(backupPath)))
     {
         report.errors.push_back("backup file has invalid extension: " + backupPath);
         return report;
