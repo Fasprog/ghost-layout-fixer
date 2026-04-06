@@ -2,12 +2,17 @@
 
 #include <src/platform/SystemCommandRunner.h>
 
-#include <cstdlib>
 #include <sstream>
 #include <unordered_set>
 
 namespace
 {
+
+const ghost::platform::ICommandRunner& defaultRunner()
+{
+    static const ghost::platform::SystemCommandRunner runner;
+    return runner;
+}
 
 std::vector<std::string> parseLanguageTags(const std::string& output)
 {
@@ -39,13 +44,17 @@ std::vector<std::string> parseLanguageTags(const std::string& output)
 namespace ghost::platform
 {
 
+InstalledLanguageService::InstalledLanguageService(const ICommandRunner* runner)
+    : runner_(runner != nullptr ? runner : &defaultRunner())
+{
+}
+
 std::vector<std::string> InstalledLanguageService::listInstalledLayoutCodes() const
 {
-    const SystemCommandRunner runner;
-    const CommandResult result = runner.run(
+    const CommandResult result = runner_->run(
         "powershell -NoProfile -Command \"(Get-WinUserLanguageList).LanguageTag\"");
 
-    return parseLanguageTags(result.stdoutText);
+    return parseLanguageTags(result.outputText);
 }
 
 } // namespace ghost::platform

@@ -19,14 +19,14 @@ CommandResult SystemCommandRunner::run(const std::string& command) const
     if (pipe == nullptr)
     {
         result.exitCode = 1;
-        result.stderrText = "failed to start command";
+        result.outputText = "failed to start command";
         return result;
     }
 
     std::array<char, 256> buffer{};
     while (fgets(buffer.data(), static_cast<int>(buffer.size()), pipe) != nullptr)
     {
-        result.stdoutText += buffer.data();
+        result.outputText += buffer.data();
     }
 
 #if defined(_WIN32)

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <src/core/Models.h>
+#include <src/platform/SystemCommandRunner.h>
 
 #include <string>
 
@@ -11,6 +12,8 @@ namespace ghost::core
 class BackupService
 {
 public:
+    explicit BackupService(const ghost::platform::ICommandRunner* runner = nullptr);
+
     /// @brief Генерирует имя backup-файла в рабочей директории.
     std::string makeBackupPath() const;
 
@@ -23,6 +26,9 @@ public:
     /// @param[in] backupPath Путь до .reg файла.
     /// @return Отчёт о выполнении операции восстановления.
     RestoreReport restoreBackup(const std::string& backupPath) const;
+
+private:
+    const ghost::platform::ICommandRunner* runner_;
 };
 
 } // namespace ghost::core

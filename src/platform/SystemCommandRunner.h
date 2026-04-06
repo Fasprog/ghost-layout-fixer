@@ -9,18 +9,26 @@ namespace ghost::platform
 struct CommandResult
 {
     int exitCode{0};
-    std::string stdoutText;
-    std::string stderrText;
+    /// @brief Объединённый stdout/stderr поток команды.
+    std::string outputText;
+};
+
+/// @brief Контракт запуска системных команд.
+class ICommandRunner
+{
+public:
+    virtual ~ICommandRunner() = default;
+    virtual CommandResult run(const std::string& command) const = 0;
 };
 
 /// @brief Запускает системные команды и возвращает результат.
-class SystemCommandRunner
+class SystemCommandRunner final : public ICommandRunner
 {
 public:
     /// @brief Выполняет команду в системе.
     /// @param[in] command Строка команды.
     /// @return Результат выполнения команды.
-    CommandResult run(const std::string& command) const;
+    CommandResult run(const std::string& command) const override;
 };
 
 } // namespace ghost::platform

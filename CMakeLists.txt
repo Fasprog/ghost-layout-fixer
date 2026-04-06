@@ -11,6 +11,7 @@ include(cmake/warnings.cmake)
 
 add_executable(ghost-layout-fixer
     src/main.cpp
+    src/app/src/ApplicationService.cpp
     src/cli/src/CliParser.cpp
     src/core/src/BackupService.cpp
     src/core/src/LayoutFixService.cpp
@@ -31,11 +32,15 @@ glf_apply_warnings(ghost-layout-fixer)
 if(BUILD_TESTS)
     enable_testing()
     add_executable(ghost-layout-fixer-tests
+        src/app/src/ApplicationService.cpp
         src/cli/src/CliParser.cpp
         src/core/src/BackupService.cpp
         src/core/src/LayoutFixService.cpp
         src/platform/src/RegistryService.cpp
         src/platform/src/SystemCommandRunner.cpp
+        src/platform/src/PrivilegeService.cpp
+        src/platform/src/InstalledLanguageService.cpp
+        src/report/src/ReportPrinter.cpp
         tests/commands/CommandWorkflowTests.cpp
     )
     target_include_directories(ghost-layout-fixer-tests PRIVATE

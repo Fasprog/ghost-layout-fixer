@@ -88,6 +88,43 @@ CliOptions CliParser::parse(int argc, const char* const argv[]) const
         options.parseErrors.push_back("unknown argument: " + std::string(arg));
     }
 
+    if (options.command == CommandType::Scan || options.command == CommandType::Backup)
+    {
+        if (options.layoutCode.has_value())
+        {
+            options.parseErrors.push_back("--layout is only supported for fix");
+        }
+        if (options.restoreFile.has_value())
+        {
+            options.parseErrors.push_back("--file is only supported for restore");
+        }
+        if (options.dryRun)
+        {
+            options.parseErrors.push_back("--dry-run is only supported for fix");
+        }
+        if (options.assumeYes)
+        {
+            options.parseErrors.push_back("--yes is only supported for fix/restore");
+        }
+    }
+
+    if (options.command == CommandType::Fix && options.restoreFile.has_value())
+    {
+        options.parseErrors.push_back("--file cannot be used with fix");
+    }
+
+    if (options.command == CommandType::Restore)
+    {
+        if (options.layoutCode.has_value())
+        {
+            options.parseErrors.push_back("--layout cannot be used with restore");
+        }
+        if (options.dryRun)
+        {
+            options.parseErrors.push_back("--dry-run cannot be used with restore");
+        }
+    }
+
     return options;
 }
 
