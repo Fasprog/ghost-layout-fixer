@@ -32,11 +32,17 @@ std::string BackupService::makeBackupPath() const
 {
     const auto now = std::chrono::system_clock::now();
     const std::time_t nowTime = std::chrono::system_clock::to_time_t(now);
-    const std::tm* utc = std::gmtime(&nowTime);
+
+    std::tm utc{};
+    #ifdef _WIN32
+        gmtime_s(&utc, &nowTime);
+    #else
+        gmtime_r(&nowTime, &utc);
+    #endif
 
     std::ostringstream name;
     name << "ghost-layout-backup-";
-    name << std::put_time(utc, "%Y%m%d-%H%M%S");
+    name << std::put_time(&utc, "%Y%m%d-%H%M%S");
     name << ".reg";
     return name.str();
 }
