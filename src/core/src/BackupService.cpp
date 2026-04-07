@@ -78,11 +78,7 @@ std::string BackupService::makeBackupPath() const
     const std::time_t nowTime = std::chrono::system_clock::to_time_t(now);
 
     std::tm utc{};
-#ifdef _WIN32
     gmtime_s(&utc, &nowTime);
-#else
-    gmtime_r(&nowTime, &utc);
-#endif
 
     std::ostringstream name;
     name << "ghost-layout-backup-";
