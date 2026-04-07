@@ -39,9 +39,9 @@ private:
     {
     }
 
-    bool success_{false};
-    T value_{};
-    E error_{};
+    bool success_ = false;
+    T value_ = {};
+    E error_ = {};
 };
 
 } // namespace ghost::common

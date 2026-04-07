@@ -27,13 +27,13 @@ struct FixReport
     std::vector<std::string> executedSteps;
     std::vector<std::string> errors;
     std::string backupPath;
-    bool success{false};
+    bool success = false;
 };
 
 /// @brief Отчёт о создании backup.
 struct BackupReport
 {
-    bool success{false};
+    bool success = false;
     std::string backupPath;
     std::vector<std::string> executedCommands;
     std::vector<std::string> errors;
@@ -42,7 +42,7 @@ struct BackupReport
 /// @brief Отчёт о восстановлении backup.
 struct RestoreReport
 {
-    bool success{false};
+    bool success = false;
     std::string sourcePath;
     std::vector<std::string> executedCommands;
     std::vector<std::string> errors;

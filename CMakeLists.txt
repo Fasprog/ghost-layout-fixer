@@ -1,6 +1,10 @@
 cmake_minimum_required(VERSION 3.20)
 project(ghost-layout-fixer LANGUAGES CXX)
 
+if (NOT WIN32)
+    message(FATAL_ERROR "ghost-layout-fixer supports Windows only")
+endif()
+
 option(BUILD_TESTS "Build unit tests" OFF)
 
 set(CMAKE_CXX_STANDARD 20)

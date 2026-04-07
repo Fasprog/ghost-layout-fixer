@@ -8,7 +8,7 @@ namespace ghost::platform
 /// @brief Результат запуска системной команды.
 struct CommandResult
 {
-    int exitCode{0};
+    int exitCode = 0;
     /// @brief Объединённый stdout/stderr поток команды.
     std::string outputText;
 };

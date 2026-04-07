@@ -1,17 +1,12 @@
 #include <src/platform/PrivilegeService.h>
 
-#if defined(_WIN32)
 #include <windows.h>
-#else
-#include <unistd.h>
-#endif
 
 namespace ghost::platform
 {
 
 bool PrivilegeService::isRunningAsAdmin() const
 {
-#if defined(_WIN32)
     BOOL isMember = FALSE;
     SID_IDENTIFIER_AUTHORITY ntAuthority = SECURITY_NT_AUTHORITY;
     PSID adminGroup = nullptr;
@@ -39,9 +34,6 @@ bool PrivilegeService::isRunningAsAdmin() const
     }
 
     return isMember == TRUE;
-#else
-    return geteuid() == 0;
-#endif
 }
 
 } // namespace ghost::platform

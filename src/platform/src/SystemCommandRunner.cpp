@@ -10,11 +10,7 @@ CommandResult SystemCommandRunner::run(const std::string& command) const
 {
     CommandResult result;
 
-#if defined(_WIN32)
     FILE* pipe = _popen((command + " 2>&1").c_str(), "r");
-#else
-    FILE* pipe = popen((command + " 2>&1").c_str(), "r");
-#endif
 
     if (pipe == nullptr)
     {
@@ -29,11 +25,7 @@ CommandResult SystemCommandRunner::run(const std::string& command) const
         result.outputText += buffer.data();
     }
 
-#if defined(_WIN32)
     result.exitCode = _pclose(pipe);
-#else
-    result.exitCode = pclose(pipe);
-#endif
 
     return result;
 }
