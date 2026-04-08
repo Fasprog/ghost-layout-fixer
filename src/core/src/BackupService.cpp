@@ -10,6 +10,7 @@
 #include <sstream>
 #include <string_view>
 #include <vector>
+#include <windows.h>
 
 namespace
 {
@@ -62,6 +63,30 @@ bool hasRegExtensionCaseInsensitive(const std::filesystem::path& path)
            (extension[3] == 'g' || extension[3] == 'G');
 }
 
+std::filesystem::path executableDirectory()
+{
+    std::wstring buffer(static_cast<std::size_t>(MAX_PATH), L'\0');
+    DWORD copied = 0;
+    while (true)
+    {
+        copied = GetModuleFileNameW(nullptr, buffer.data(), static_cast<DWORD>(buffer.size()));
+        if (copied == 0)
+        {
+            return {};
+        }
+
+        if (copied < buffer.size() - 1)
+        {
+            break;
+        }
+
+        buffer.resize(buffer.size() * 2);
+    }
+
+    buffer.resize(copied);
+    return std::filesystem::path(buffer).parent_path();
+}
+
 } // namespace
 
 namespace ghost::core
@@ -84,7 +109,9 @@ std::string BackupService::makeBackupPath() const
     name << "ghost-layout-backup-";
     name << std::put_time(&utc, "%Y%m%d-%H%M%S");
     name << ".reg";
-    return name.str();
+
+    const std::filesystem::path backupDirectory = executableDirectory() / "backups";
+    return (backupDirectory / name.str()).string();
 }
 
 BackupReport BackupService::createBackup(const std::string& backupPath) const
@@ -128,6 +155,21 @@ BackupReport BackupService::createBackup(const std::string& backupPath) const
         report.success = false;
         cleanupExportedFiles();
         return report;
+    }
+
+    const std::filesystem::path backupFilePath(backupPath);
+    const std::filesystem::path backupDirectory = backupFilePath.parent_path();
+    if (!backupDirectory.empty())
+    {
+        std::error_code createDirectoryError;
+        std::filesystem::create_directories(backupDirectory, createDirectoryError);
+        if (createDirectoryError)
+        {
+            report.errors.push_back("backup failed: cannot create directory " + backupDirectory.string());
+            report.success = false;
+            cleanupExportedFiles();
+            return report;
+        }
     }
 
     std::ofstream mergedBackup(backupPath, std::ios::binary | std::ios::trunc);

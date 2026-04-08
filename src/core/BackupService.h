@@ -3,6 +3,7 @@
 #include <src/core/Models.h>
 #include <src/platform/SystemCommandRunner.h>
 
+#include <filesystem>
 #include <string>
 
 namespace ghost::core
@@ -14,7 +15,7 @@ class BackupService
 public:
     explicit BackupService(const ghost::platform::ICommandRunner* runner = nullptr);
 
-    /// @brief Генерирует имя backup-файла в рабочей директории.
+    /// @brief Генерирует имя backup-файла в <exe_dir>\backups.
     std::string makeBackupPath() const;
 
     /// @brief Выполняет экспорт реестра в backup-файл.
