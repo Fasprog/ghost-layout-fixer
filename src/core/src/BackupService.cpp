@@ -16,17 +16,6 @@
 namespace
 {
 
-std::vector<std::string> registryBranchesForBackup()
-{
-    return {
-        "HKEY_CURRENT_USER\\Keyboard Layout\\Preload",
-        "HKEY_CURRENT_USER\\Keyboard Layout\\Substitutes",
-        "HKEY_USERS\\.DEFAULT\\Keyboard Layout\\Preload",
-        "HKEY_USERS\\.DEFAULT\\Keyboard Layout\\Substitutes",
-        "HKEY_CURRENT_USER\\Control Panel\\International\\User Profile"
-    };
-}
-
 const ghost::platform::ICommandRunner& defaultRunner()
 {
     static const ghost::platform::SystemCommandRunner runner;
