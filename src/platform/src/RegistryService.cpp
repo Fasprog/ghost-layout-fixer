@@ -4,6 +4,7 @@
 #include <src/platform/RegistryBranches.h>
 
 #include <sstream>
+#include <cctype>
 #include <string_view>
 #include <unordered_map>
 #include <unordered_set>
@@ -157,6 +158,54 @@ std::vector<RegistrySnapshot> readRegistrySnapshots(const ghost::platform::IComm
     return snapshots;
 }
 
+bool isSafeRegistryBranchPath(const std::string& value)
+{
+    if (value.empty())
+    {
+        return false;
+    }
+
+    for (const char symbol : value)
+    {
+        const unsigned char normalized = static_cast<unsigned char>(symbol);
+        if (symbol == '"' || symbol == '\r' || symbol == '\n')
+        {
+            return false;
+        }
+
+        if (!(std::isalnum(normalized) || symbol == '\\' || symbol == '_' || symbol == '-' || symbol == ' '))
+        {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+bool isSafeRegistryValueName(const std::string& value)
+{
+    if (value.empty())
+    {
+        return false;
+    }
+
+    for (const char symbol : value)
+    {
+        const unsigned char normalized = static_cast<unsigned char>(symbol);
+        if (symbol == '"' || symbol == '\r' || symbol == '\n')
+        {
+            return false;
+        }
+
+        if (!(std::isalnum(normalized) || symbol == '_' || symbol == '-' || symbol == ' '))
+        {
+            return false;
+        }
+    }
+
+    return true;
+}
+
 } // namespace
 
 namespace ghost::platform
@@ -188,13 +237,17 @@ std::vector<RegistryMatch> RegistryService::findLayoutMatches(const std::string&
 std::vector<std::string> RegistryService::listLayoutCodesFromRegistry() const
 {
     const std::vector<RegistrySnapshot> snapshots = readRegistrySnapshots(*runner_);
-    std::unordered_set<std::string> uniqueLayouts;
+    std::unordered_set<std::string> seenLayouts;
+    std::vector<std::string> layouts;
     for (const RegistrySnapshot& snapshot : snapshots)
     {
-        uniqueLayouts.insert(snapshot.layoutCode);
+        if (seenLayouts.insert(snapshot.layoutCode).second)
+        {
+            layouts.push_back(snapshot.layoutCode);
+        }
     }
 
-    return std::vector<std::string>(uniqueLayouts.begin(), uniqueLayouts.end());
+    return layouts;
 }
 
 std::vector<std::string> RegistryService::deleteMatches(const std::vector<RegistryMatch>& matches) const
@@ -203,6 +256,13 @@ std::vector<std::string> RegistryService::deleteMatches(const std::vector<Regist
 
     for (const RegistryMatch& match : matches)
     {
+        if (!isSafeRegistryBranchPath(match.branchPath) || !isSafeRegistryValueName(match.valueName))
+        {
+            errors.push_back(
+                "failed to delete " + match.branchPath + "\\" + match.valueName + ": invalid registry path/value");
+            continue;
+        }
+
         const std::string command =
             "reg delete \"" + match.branchPath + "\" /v \"" + match.valueName + "\" /f";
         const ghost::platform::CommandResult result = runner_->run(command);

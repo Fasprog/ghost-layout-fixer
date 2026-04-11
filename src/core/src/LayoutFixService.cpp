@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <regex>
 #include <unordered_set>
 
 namespace
@@ -54,6 +55,13 @@ bool isInstalled(
 
     const std::string registryPrimary = primaryLanguageTag(registryLayout);
     return installedPrimaryCodes.find(registryPrimary) != installedPrimaryCodes.end();
+}
+
+bool isValidLanguageTag(const std::string& value)
+{
+    static const std::regex kLanguageTagPattern(
+        "^[A-Za-z]{2,3}(?:-[A-Za-z0-9]{2,8})*$");
+    return std::regex_match(value, kLanguageTagPattern);
 }
 
 } // namespace
@@ -133,10 +141,16 @@ FixReport LayoutFixService::executeFix(
     const std::string& backupPath,
     const ghost::platform::RegistryService& registryService) const
 {
-     
     FixReport report;
     report.backupPath = backupPath;
     report.executedSteps.push_back("backup created: " + backupPath);
+
+    if (!isValidLanguageTag(layoutCode))
+    {
+        report.errors.push_back("invalid layout code format: " + layoutCode);
+        report.success = false;
+        return report;
+    }
 
     const std::string addCommand =
         "powershell -NoProfile -Command \"$list = Get-WinUserLanguageList; "

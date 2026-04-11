@@ -3,6 +3,7 @@
 #include <src/core/ExitCodes.h>
 
 #include <cstddef>
+#include <cctype>
 #include <string>
 #include <vector>
 
@@ -29,6 +30,44 @@ std::string joinLayouts(const std::vector<std::string>& layouts)
     return result;
 }
 
+std::string normalizeDisplayLanguageTag(const std::string& languageTag)
+{
+    if (languageTag.find('-') != std::string::npos)
+    {
+        return languageTag;
+    }
+
+    if (languageTag.size() != 2)
+    {
+        return languageTag;
+    }
+
+    const unsigned char first = static_cast<unsigned char>(languageTag[0]);
+    const unsigned char second = static_cast<unsigned char>(languageTag[1]);
+    if (!std::isalpha(first) || !std::isalpha(second))
+    {
+        return languageTag;
+    }
+
+    std::string normalized = languageTag;
+    normalized.push_back('-');
+    normalized.push_back(static_cast<char>(std::toupper(first)));
+    normalized.push_back(static_cast<char>(std::toupper(second)));
+    return normalized;
+}
+
+std::vector<std::string> normalizeInstalledLayoutDisplay(const std::vector<std::string>& installedLayouts)
+{
+    std::vector<std::string> normalized;
+    normalized.reserve(installedLayouts.size());
+    for (const std::string& layout : installedLayouts)
+    {
+        normalized.push_back(normalizeDisplayLanguageTag(layout));
+    }
+
+    return normalized;
+}
+
 std::vector<std::string> toMatchSummaries(const std::vector<ghost::platform::RegistryMatch>& matches)
 {
     std::vector<std::string> summaries;
@@ -49,7 +88,7 @@ void printHelp(const ghost::report::ReportPrinter& printer)
     printer.print("  ghost-layout-fixer backup");
     printer.print("  ghost-layout-fixer fix --layout <language-tag> --dry-run");
     printer.print("  ghost-layout-fixer fix --layout <language-tag>");
-    printer.print("  ghost-layout-fixer restore --file .\\backups\\backup.reg");
+    printer.print("  ghost-layout-fixer restore --file .\\backups\\ghost-layout-backup-20260411-101530.reg");
 }
 
 } // namespace
@@ -103,9 +142,11 @@ int ApplicationService::run(const ghost::cli::CliOptions& options) const
         const std::vector<std::string> registryLayouts = registryService_.listLayoutCodesFromRegistry();
         const std::vector<std::string> installedLayouts = installedLanguageService_.listInstalledLayoutCodes();
         const ghost::core::ScanResult scanResult = layoutFixService_.scan(registryLayouts, installedLayouts);
+        const std::vector<std::string> installedLayoutsForDisplay =
+            normalizeInstalledLayoutDisplay(scanResult.installedLayouts);
 
         printer_.print("[scan] registry layouts: " + joinLayouts(scanResult.registryLayouts));
-        printer_.print("[scan] installed layouts: " + joinLayouts(scanResult.installedLayouts));
+        printer_.print("[scan] installed layouts: " + joinLayouts(installedLayoutsForDisplay));
         printer_.print("[scan] ghost layouts: " + joinLayouts(scanResult.ghostLayouts));
         printer_.print("[scan] status: " + scanResult.status);
         return static_cast<int>(ghost::core::ExitCode::Success);
