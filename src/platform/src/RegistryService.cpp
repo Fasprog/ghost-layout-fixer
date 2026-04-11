@@ -173,7 +173,8 @@ bool isSafeRegistryBranchPath(const std::string& value)
             return false;
         }
 
-        if (!(std::isalnum(normalized) || symbol == '\\' || symbol == '_' || symbol == '-' || symbol == ' '))
+        if (!(std::isalnum(normalized) || symbol == '\\' || symbol == '_' || symbol == '-' || symbol == ' ' ||
+              symbol == '.'))
         {
             return false;
         }
