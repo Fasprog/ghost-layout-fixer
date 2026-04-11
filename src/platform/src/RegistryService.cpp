@@ -1,6 +1,7 @@
 #include <src/platform/RegistryService.h>
 
 #include <src/platform/SystemCommandRunner.h>
+#include <src/platform/RegistryBranches.h>
 
 #include <sstream>
 #include <string_view>
@@ -12,7 +13,6 @@ namespace
 
 struct RegistrySnapshot
 {
-    std::string location;
     std::string branchPath;
     std::string valueName;
     std::string valueData;
@@ -98,20 +98,8 @@ std::string hklToLayoutCode(
     return found->second;
 }
 
-std::vector<std::pair<std::string, std::string>> registryBranches()
-{
-    return {
-        {"HKCU\\Keyboard Layout\\Preload", "HKEY_CURRENT_USER\\Keyboard Layout\\Preload"},
-        {"HKCU\\Keyboard Layout\\Substitutes", "HKEY_CURRENT_USER\\Keyboard Layout\\Substitutes"},
-        {"HKU\\.DEFAULT\\Keyboard Layout\\Preload", "HKEY_USERS\\.DEFAULT\\Keyboard Layout\\Preload"},
-        {"HKU\\.DEFAULT\\Keyboard Layout\\Substitutes", "HKEY_USERS\\.DEFAULT\\Keyboard Layout\\Substitutes"},
-        {"HKCU\\Control Panel\\International\\User Profile", "HKEY_CURRENT_USER\\Control Panel\\International\\User Profile"}
-    };
-}
-
 std::vector<RegistrySnapshot> parseRegistryEntries(
     const std::string& regOutput,
-    const std::string& location,
     const std::string& branchPath,
     const std::unordered_map<std::string, std::string>& lcidMapping)
 {
@@ -135,7 +123,6 @@ std::vector<RegistrySnapshot> parseRegistryEntries(
         }
 
         RegistrySnapshot snapshot;
-        snapshot.location = location;
         snapshot.branchPath = branchPath;
         snapshot.valueName = valueName;
         snapshot.valueData = valueData;
@@ -155,7 +142,7 @@ std::vector<RegistrySnapshot> readRegistrySnapshots(const ghost::platform::IComm
         return snapshots;
     }
 
-    for (const auto& [locationAlias, branchPath] : registryBranches())
+    for (const std::string& branchPath : ghost::platform::kRegistryBranches)
     {
         const ghost::platform::CommandResult query = runner.run("reg query \"" + branchPath + "\"");
         if (query.exitCode != 0)
@@ -163,8 +150,7 @@ std::vector<RegistrySnapshot> readRegistrySnapshots(const ghost::platform::IComm
             continue;
         }
 
-        const std::vector<RegistrySnapshot> parsed =
-            parseRegistryEntries(query.outputText, locationAlias, branchPath, lcidMapping);
+        const std::vector<RegistrySnapshot> parsed = parseRegistryEntries(query.outputText, branchPath, lcidMapping);
         snapshots.insert(snapshots.end(), parsed.begin(), parsed.end());
     }
 
@@ -176,10 +162,7 @@ std::vector<RegistrySnapshot> readRegistrySnapshots(const ghost::platform::IComm
 namespace ghost::platform
 {
 
-RegistryService::RegistryService(const ICommandRunner* runner)
-    : runner_(runner != nullptr ? runner : &defaultRunner())
-{
-}
+RegistryService::RegistryService(const ICommandRunner* runner) : runner_(runner != nullptr ? runner : &defaultRunner()) {}
 
 std::vector<RegistryMatch> RegistryService::findLayoutMatches(const std::string& layoutCode) const
 {
@@ -193,7 +176,6 @@ std::vector<RegistryMatch> RegistryService::findLayoutMatches(const std::string&
         }
 
         RegistryMatch match;
-        match.location = snapshot.location;
         match.branchPath = snapshot.branchPath;
         match.valueName = snapshot.valueName;
         match.valueData = snapshot.valueData;

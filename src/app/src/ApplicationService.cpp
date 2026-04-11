@@ -34,7 +34,7 @@ std::vector<std::string> toMatchSummaries(const std::vector<ghost::platform::Reg
     std::vector<std::string> summaries;
     for (const ghost::platform::RegistryMatch& match : matches)
     {
-        summaries.push_back(match.location + " -> " + match.valueName + " = " + match.valueData);
+        summaries.push_back(match.branchPath + " -> " + match.valueName + " = " + match.valueData);
     }
 
     return summaries;

@@ -258,7 +258,7 @@ bool testLayoutFixFailurePathsAndScanCases()
 
     const ghost::platform::RegistryService registryService(&runner);
     const ghost::core::LayoutFixService layoutFixService(&runner);
-    const std::vector<ghost::platform::RegistryMatch> matches = {{"HKCU", "HKEY_CURRENT_USER\\Keyboard Layout\\Preload", "1", "00000409"}};
+    const std::vector<ghost::platform::RegistryMatch> matches = {{"HKEY_CURRENT_USER\\Keyboard Layout\\Preload", "1", "00000409"}};
 
     const ghost::core::FixReport fixReport =
         layoutFixService.executeFix("en-US", matches, "backup.reg", registryService);

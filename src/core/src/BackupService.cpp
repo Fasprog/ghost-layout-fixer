@@ -1,6 +1,7 @@
 #include <src/core/BackupService.h>
 
 #include <src/platform/SystemCommandRunner.h>
+#include <src/platform/RegistryBranches.h>
 
 #include <chrono>
 #include <ctime>
@@ -130,7 +131,7 @@ BackupReport BackupService::createBackup(const std::string& backupPath) const
     };
 
     int branchIndex = 0;
-    for (const std::string& branch : registryBranchesForBackup())
+    for (const std::string& branch : ghost::platform::kRegistryBranches)
     {
         const std::filesystem::path branchBackupPath =
             std::filesystem::path(backupPath + ".part" + std::to_string(branchIndex) + ".reg");
