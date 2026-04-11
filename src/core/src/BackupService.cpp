@@ -53,6 +53,24 @@ bool hasRegExtensionCaseInsensitive(const std::filesystem::path& path)
            (extension[3] == 'g' || extension[3] == 'G');
 }
 
+bool isSafePathForCommand(const std::string& path)
+{
+    if (path.empty())
+    {
+        return false;
+    }
+
+    for (const char symbol : path)
+    {
+        if (symbol == '"' || symbol == '\r' || symbol == '\n')
+        {
+            return false;
+        }
+    }
+
+    return true;
+}
+
 std::filesystem::path executableDirectory()
 {
     std::wstring buffer(static_cast<std::size_t>(MAX_PATH), L'\0');
@@ -108,6 +126,12 @@ BackupReport BackupService::createBackup(const std::string& backupPath) const
 {
     BackupReport report;
     report.backupPath = backupPath;
+    if (!isSafePathForCommand(backupPath))
+    {
+        report.errors.push_back("backup path contains unsupported characters: " + backupPath);
+        report.success = false;
+        return report;
+    }
 
     std::vector<std::filesystem::path> exportedFiles;
     const auto cleanupExportedFiles = [&exportedFiles]()
@@ -207,6 +231,11 @@ RestoreReport BackupService::restoreBackup(const std::string& backupPath) const
 {
     RestoreReport report;
     report.sourcePath = backupPath;
+    if (!isSafePathForCommand(backupPath))
+    {
+        report.errors.push_back("backup path contains unsupported characters: " + backupPath);
+        return report;
+    }
 
     if (!std::filesystem::exists(backupPath))
     {

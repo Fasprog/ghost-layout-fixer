@@ -49,7 +49,7 @@ void printHelp(const ghost::report::ReportPrinter& printer)
     printer.print("  ghost-layout-fixer backup");
     printer.print("  ghost-layout-fixer fix --layout <language-tag> --dry-run");
     printer.print("  ghost-layout-fixer fix --layout <language-tag>");
-    printer.print("  ghost-layout-fixer restore --file .\\backups\\backup.reg");
+    printer.print("  ghost-layout-fixer restore --file .\\backups\\ghost-layout-backup-YYYYMMDD-HHMMSS.reg");
 }
 
 } // namespace
@@ -103,9 +103,8 @@ int ApplicationService::run(const ghost::cli::CliOptions& options) const
         const std::vector<std::string> registryLayouts = registryService_.listLayoutCodesFromRegistry();
         const std::vector<std::string> installedLayouts = installedLanguageService_.listInstalledLayoutCodes();
         const ghost::core::ScanResult scanResult = layoutFixService_.scan(registryLayouts, installedLayouts);
-
         printer_.print("[scan] registry layouts: " + joinLayouts(scanResult.registryLayouts));
-        printer_.print("[scan] installed layouts: " + joinLayouts(scanResult.installedLayouts));
+        printer_.print("[scan] installed language tags: " + joinLayouts(scanResult.installedLayouts));
         printer_.print("[scan] ghost layouts: " + joinLayouts(scanResult.ghostLayouts));
         printer_.print("[scan] status: " + scanResult.status);
         return static_cast<int>(ghost::core::ExitCode::Success);

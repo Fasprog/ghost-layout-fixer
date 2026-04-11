@@ -17,6 +17,7 @@ const ghost::platform::ICommandRunner& defaultRunner()
 std::vector<std::string> parseLanguageTags(const std::string& output)
 {
     std::unordered_set<std::string> uniqueTags;
+    std::vector<std::string> tags;
     std::stringstream stream(output);
     std::string line;
     while (std::getline(stream, line))
@@ -32,11 +33,14 @@ std::vector<std::string> parseLanguageTags(const std::string& output)
 
         if (!tag.empty())
         {
-            uniqueTags.insert(tag);
+            if (uniqueTags.insert(tag).second)
+            {
+                tags.push_back(tag);
+            }
         }
     }
 
-    return std::vector<std::string>(uniqueTags.begin(), uniqueTags.end());
+    return tags;
 }
 
 } // namespace
