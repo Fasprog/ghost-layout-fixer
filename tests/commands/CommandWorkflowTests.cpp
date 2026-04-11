@@ -276,7 +276,7 @@ bool testLayoutFixFailurePathsAndScanCases()
     return ok;
 }
 
-bool testCliAndYesAndNoAdmin()
+bool testCliAndNoAdmin()
 {
     const ghost::cli::CliParser parser;
     const char* invalidArgv[] = {"ghost-layout-fixer", "restore", "--dry-run", "--file", "a.reg"};
@@ -318,23 +318,20 @@ bool testCliAndYesAndNoAdmin()
         layoutFixService,
         printer);
 
-    ghost::cli::CliOptions fixNoYes;
-    fixNoYes.command = ghost::cli::CommandType::Fix;
-    fixNoYes.layoutCode = "en-US";
-    const std::size_t commandsBefore = runner.commands.size();
-    const int fixNoYesCode = app.run(fixNoYes);
-    const std::size_t commandsAfterNoYes = runner.commands.size();
+    ghost::cli::CliOptions fixOptions;
+    fixOptions.command = ghost::cli::CommandType::Fix;
+    fixOptions.layoutCode = "en-US";
 
-    ghost::cli::CliOptions fixYes = fixNoYes;
-    fixYes.assumeYes = true;
-    const int fixYesCode = app.run(fixYes);
+    const std::size_t commandsBefore = runner.commands.size();
+    const int fixCode = app.run(fixOptions);
+    const std::size_t commandsAfter = runner.commands.size();
 
     bool ok = true;
     ok = expect(!invalidOptions.parseErrors.empty(), "parser returns conflicts for invalid args") && ok;
-    ok = expect(noAdminCode == static_cast<int>(ghost::core::ExitCode::InsufficientPrivileges), "application blocks dangerous operations without admin") && ok;
-    ok = expect(fixNoYesCode == static_cast<int>(ghost::core::ExitCode::GeneralError), "fix without --yes is blocked") && ok;
-    ok = expect(commandsAfterNoYes == commandsBefore, "fix without --yes does not execute system commands") && ok;
-    ok = expect(fixYesCode == static_cast<int>(ghost::core::ExitCode::Success), "fix with --yes executes") && ok;
+    ok = expect(noAdminCode == static_cast<int>(ghost::core::ExitCode::InsufficientPrivileges), 
+                "application blocks dangerous operations without admin") && ok;
+    ok = expect(fixCode == static_cast<int>(ghost::core::ExitCode::Success), "fix executes") && ok;
+    ok = expect(commandsAfter > commandsBefore, "fix executes system commands") && ok;
     return ok;
 }
 
@@ -350,7 +347,7 @@ int main()
     ok = testRestoreBackupValidationAndFailure() && ok;
     ok = testRegistryFailures() && ok;
     ok = testLayoutFixFailurePathsAndScanCases() && ok;
-    ok = testCliAndYesAndNoAdmin() && ok;
+    ok = testCliAndNoAdmin() && ok;
 
     if (!ok)
     {

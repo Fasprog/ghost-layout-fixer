@@ -39,11 +39,13 @@ std::string trimWhitespace(const std::string& value)
     return trimmed;
 }
 
-std::unordered_map<std::string, std::string>
-buildLcidToLanguageTagMap(const ghost::platform::ICommandRunner& runner)
+std::unordered_map<std::string, std::string> buildLcidToLanguageTagMap(const ghost::platform::ICommandRunner& runner)
 {
     const ghost::platform::CommandResult result = runner.run(
-        "powershell -NoProfile -Command \"[System.Globalization.CultureInfo]::GetCultures([System.Globalization.CultureTypes]::SpecificCultures) | ForEach-Object { '{0:X4}={1}' -f $_.LCID, $_.Name }\"");
+        "powershell -NoProfile -Command "
+        "\"[System.Globalization.CultureInfo]::GetCultures("
+        "[System.Globalization.CultureTypes]::SpecificCultures"
+        ") | ForEach-Object { '{0:X4}={1}' -f $_.LCID, $_.Name }\"");
 
     std::unordered_map<std::string, std::string> mapping;
     if (result.exitCode != 0)
@@ -51,8 +53,8 @@ buildLcidToLanguageTagMap(const ghost::platform::ICommandRunner& runner)
         return mapping;
     }
 
-    std::stringstream stream(result.outputText);
     std::string line;
+    std::stringstream stream(result.outputText);
     while (std::getline(stream, line))
     {
         const std::size_t separatorPos = line.find('=');
