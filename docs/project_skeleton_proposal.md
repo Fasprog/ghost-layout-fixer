@@ -78,7 +78,7 @@ ghost-layout-fixer/
 
 ### CLI
 - `CommandType { Scan, Fix, Backup, Restore }`
-- `CliOptions { command, layoutCode, dryRun, restoreFile, assumeYes }`
+- `CliOptions { command, layoutCode, dryRun, restoreFile }`
 
 ### Core
 - `ScanResult`

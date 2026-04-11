@@ -11,7 +11,6 @@ namespace ghost::platform
 /// @brief Совпадение записи реестра с целевой раскладкой.
 struct RegistryMatch
 {
-    std::string location;
     std::string branchPath;
     std::string valueName;
     std::string valueData;

@@ -34,7 +34,7 @@ std::vector<std::string> toMatchSummaries(const std::vector<ghost::platform::Reg
     std::vector<std::string> summaries;
     for (const ghost::platform::RegistryMatch& match : matches)
     {
-        summaries.push_back(match.location + " -> " + match.valueName + " = " + match.valueData);
+        summaries.push_back(match.branchPath + " -> " + match.valueName + " = " + match.valueData);
     }
 
     return summaries;
@@ -48,8 +48,8 @@ void printHelp(const ghost::report::ReportPrinter& printer)
     printer.print("  ghost-layout-fixer scan");
     printer.print("  ghost-layout-fixer backup");
     printer.print("  ghost-layout-fixer fix --layout <language-tag> --dry-run");
-    printer.print("  ghost-layout-fixer fix --layout <language-tag> --yes");
-    printer.print("  ghost-layout-fixer restore --file C:\\path\\backup.reg --yes");
+    printer.print("  ghost-layout-fixer fix --layout <language-tag>");
+    printer.print("  ghost-layout-fixer restore --file .\\backups\\backup.reg");
 }
 
 } // namespace
@@ -136,16 +136,6 @@ int ApplicationService::run(const ghost::cli::CliOptions& options) const
 
         printer_.print("[backup] created: " + report.backupPath);
         return static_cast<int>(ghost::core::ExitCode::Success);
-    }
-
-    if ((options.command == ghost::cli::CommandType::Fix && !options.dryRun) ||
-        options.command == ghost::cli::CommandType::Restore)
-    {
-        if (!options.assumeYes)
-        {
-            printer_.print("[error] dangerous operation requires --yes to proceed");
-            return static_cast<int>(ghost::core::ExitCode::GeneralError);
-        }
     }
 
     if (options.command == ghost::cli::CommandType::Fix && options.dryRun)

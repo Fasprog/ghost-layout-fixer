@@ -24,7 +24,6 @@ struct CliOptions
     std::optional<std::string> layoutCode;
     bool dryRun = false;
     std::optional<std::string> restoreFile;
-    bool assumeYes = false;
     bool showHelp = false;
     std::vector<std::string> parseErrors;
 };

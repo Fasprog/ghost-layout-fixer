@@ -67,12 +67,6 @@ CliOptions CliParser::parse(int argc, const char* const argv[]) const
             continue;
         }
 
-        if (arg == "--yes")
-        {
-            options.assumeYes = true;
-            continue;
-        }
-
         if (arg == "--file" && index + 1 < argc)
         {
             options.restoreFile = argv[index + 1];
@@ -101,10 +95,6 @@ CliOptions CliParser::parse(int argc, const char* const argv[]) const
         if (options.dryRun)
         {
             options.parseErrors.push_back("--dry-run is only supported for fix");
-        }
-        if (options.assumeYes)
-        {
-            options.parseErrors.push_back("--yes is only supported for fix/restore");
         }
     }
 
