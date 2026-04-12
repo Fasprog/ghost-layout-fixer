@@ -31,17 +31,13 @@ public:
         const std::vector<std::string>& registryMatchSummaries,
         const std::string& backupPath) const;
 
-    /// @brief Выполняет реальный fix: add/remove cycle + cleanup следов в реестре.
+    /// @brief Выполняет реальный fix: add/remove cycle.
     /// @param[in] layoutCode Целевая раскладка.
-    /// @param[in] matches Совпадения, подлежащие удалению.
     /// @param[in] backupPath Путь к уже созданному backup.
-    /// @param[in] registryService Сервис удаления совпадений.
     /// @return Итоговый отчёт фиксации.
     FixReport executeFix(
         const std::string& layoutCode,
-        const std::vector<ghost::platform::RegistryMatch>& matches,
-        const std::string& backupPath,
-        const ghost::platform::RegistryService& registryService) const;
+        const std::string& backupPath) const;
 
 private:
     const ghost::platform::ICommandRunner* runner_;
