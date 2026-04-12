@@ -203,15 +203,16 @@ int ApplicationService::run(const ghost::cli::CliOptions& options) const
         ghost::core::ScanResult finalScanResult = scanResult;
         const std::size_t stepsBeforeCleanup = fixReport.executedSteps.size();
         const std::size_t errorsBeforeCleanup = fixReport.errors.size();
+        const std::vector<ghost::platform::RegistryMatch> actualMatches =
+            registryService_.findLayoutMatches(*options.layoutCode);
 
-        if (scanResult.ghostLayouts.empty())
+        if (actualMatches.empty())
         {
-            fixReport.executedSteps.push_back("registry cleanup skipped: ghost layout not found after add/remove");
+            fixReport.executedSteps.push_back(
+                "registry cleanup skipped: no matches for requested layout after add/remove");
         }
         else
         {
-            const std::vector<ghost::platform::RegistryMatch> actualMatches =
-                registryService_.findLayoutMatches(*options.layoutCode);
             fixReport.executedSteps.push_back(
                 "registry cleanup matches: " + std::to_string(actualMatches.size()));
             const std::vector<std::string> cleanupErrors = registryService_.deleteMatches(actualMatches);
