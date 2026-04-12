@@ -143,6 +143,21 @@ BackupReport BackupService::createBackup(const std::string& backupPath) const
         }
     };
 
+    const std::filesystem::path backupFilePath(backupPath);
+    const std::filesystem::path backupDirectory = backupFilePath.parent_path();
+    if (!backupDirectory.empty())
+    {
+        std::error_code createDirectoryError;
+        std::filesystem::create_directories(backupDirectory, createDirectoryError);
+        if (createDirectoryError)
+        {
+            report.errors.push_back("backup failed: cannot create directory " + backupDirectory.string());
+            report.success = false;
+            cleanupExportedFiles();
+            return report;
+        }
+    }
+
     int branchIndex = 0;
     for (const std::string& branch : ghost::platform::kRegistryBranches)
     {
@@ -169,21 +184,6 @@ BackupReport BackupService::createBackup(const std::string& backupPath) const
         report.success = false;
         cleanupExportedFiles();
         return report;
-    }
-
-    const std::filesystem::path backupFilePath(backupPath);
-    const std::filesystem::path backupDirectory = backupFilePath.parent_path();
-    if (!backupDirectory.empty())
-    {
-        std::error_code createDirectoryError;
-        std::filesystem::create_directories(backupDirectory, createDirectoryError);
-        if (createDirectoryError)
-        {
-            report.errors.push_back("backup failed: cannot create directory " + backupDirectory.string());
-            report.success = false;
-            cleanupExportedFiles();
-            return report;
-        }
     }
 
     std::ofstream mergedBackup(backupPath, std::ios::binary | std::ios::trunc);

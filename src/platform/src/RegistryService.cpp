@@ -264,8 +264,7 @@ std::vector<std::string> RegistryService::deleteMatches(const std::vector<Regist
             continue;
         }
 
-        const std::string command =
-            "reg delete \"" + match.branchPath + "\" /v \"" + match.valueName + "\" /f";
+        const std::string command = "reg delete \"" + match.branchPath + "\" /v \"" + match.valueName + "\" /f";
         const ghost::platform::CommandResult result = runner_->run(command);
         if (result.exitCode != 0)
         {
