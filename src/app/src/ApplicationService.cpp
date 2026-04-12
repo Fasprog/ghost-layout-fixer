@@ -200,6 +200,7 @@ int ApplicationService::run(const ghost::cli::CliOptions& options) const
         const std::vector<std::string> registryLayouts = registryService_.listLayoutCodesFromRegistry();
         const std::vector<std::string> installedLayouts = installedLanguageService_.listInstalledLayoutCodes();
         const ghost::core::ScanResult scanResult = layoutFixService_.scan(registryLayouts, installedLayouts);
+        ghost::core::ScanResult finalScanResult = scanResult;
         const std::size_t stepsBeforeCleanup = fixReport.executedSteps.size();
         const std::size_t errorsBeforeCleanup = fixReport.errors.size();
 
@@ -215,9 +216,21 @@ int ApplicationService::run(const ghost::cli::CliOptions& options) const
                 "registry cleanup matches: " + std::to_string(actualMatches.size()));
             const std::vector<std::string> cleanupErrors = registryService_.deleteMatches(actualMatches);
             fixReport.errors.insert(fixReport.errors.end(), cleanupErrors.begin(), cleanupErrors.end());
+
+            const std::vector<std::string> registryLayoutsAfterCleanup =
+                registryService_.listLayoutCodesFromRegistry();
+            const std::vector<std::string> installedLayoutsAfterCleanup =
+                installedLanguageService_.listInstalledLayoutCodes();
+            finalScanResult =
+                layoutFixService_.scan(registryLayoutsAfterCleanup, installedLayoutsAfterCleanup);
+            if (!finalScanResult.ghostLayouts.empty())
+            {
+                fixReport.executedSteps.push_back(
+                    "registry cleanup completed but ghost layout is still present");
+            }
         }
 
-        fixReport.success = fixReport.errors.empty();
+        fixReport.success = fixReport.errors.empty() && finalScanResult.ghostLayouts.empty();
 
         for (std::size_t index = stepsBeforeCleanup; index < fixReport.executedSteps.size(); ++index)
         {
@@ -228,7 +241,7 @@ int ApplicationService::run(const ghost::cli::CliOptions& options) const
             printer_.print("[fix] error: " + fixReport.errors[index]);
         }
 
-        printer_.print("[fix] post-scan ghost layouts: " + joinLayouts(scanResult.ghostLayouts));
+        printer_.print("[fix] post-scan ghost layouts: " + joinLayouts(finalScanResult.ghostLayouts));
         printer_.print("[fix] recommendation: reboot or sign out to apply language switcher state");
 
         if (!fixReport.success)
