@@ -231,7 +231,18 @@ int ApplicationService::run(const ghost::cli::CliOptions& options) const
             }
         }
 
-        fixReport.success = fixReport.errors.empty() && finalScanResult.ghostLayouts.empty();
+        const std::vector<ghost::platform::RegistryMatch> finalTargetMatches =
+            registryService_.findLayoutMatches(*options.layoutCode);
+        if (finalTargetMatches.empty())
+        {
+            fixReport.executedSteps.push_back("target layout removed successfully");
+        }
+        else
+        {
+            fixReport.executedSteps.push_back("requested layout is still present after cleanup");
+        }
+
+        fixReport.success = fixReport.errors.empty() && finalTargetMatches.empty();
 
         for (std::size_t index = stepsBeforeCleanup; index < fixReport.executedSteps.size(); ++index)
         {
