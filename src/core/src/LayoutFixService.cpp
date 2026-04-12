@@ -137,9 +137,7 @@ FixPlan LayoutFixService::buildDryRunPlan(
 
 FixReport LayoutFixService::executeFix(
     const std::string& layoutCode,
-    const std::vector<ghost::platform::RegistryMatch>& matches,
-    const std::string& backupPath,
-    const ghost::platform::RegistryService& registryService) const
+    const std::string& backupPath) const
 {
     FixReport report;
     report.backupPath = backupPath;
@@ -174,10 +172,6 @@ FixReport LayoutFixService::executeFix(
     {
         report.errors.push_back("standard remove failed: " + removeResult.outputText);
     }
-
-    report.executedSteps.push_back("registry cleanup matches: " + std::to_string(matches.size()));
-    const std::vector<std::string> cleanupErrors = registryService.deleteMatches(matches);
-    report.errors.insert(report.errors.end(), cleanupErrors.begin(), cleanupErrors.end());
 
     report.success = report.errors.empty();
     return report;

@@ -185,10 +185,8 @@ int ApplicationService::run(const ghost::cli::CliOptions& options) const
             return static_cast<int>(ghost::core::ExitCode::BackupError);
         }
 
-        const std::vector<ghost::platform::RegistryMatch> matches =
-            registryService_.findLayoutMatches(*options.layoutCode);
-        const ghost::core::FixReport fixReport =
-            layoutFixService_.executeFix(*options.layoutCode, matches, backupPath, registryService_);
+        ghost::core::FixReport fixReport =
+            layoutFixService_.executeFix(*options.layoutCode, backupPath);
 
         for (const std::string& step : fixReport.executedSteps)
         {
@@ -202,6 +200,34 @@ int ApplicationService::run(const ghost::cli::CliOptions& options) const
         const std::vector<std::string> registryLayouts = registryService_.listLayoutCodesFromRegistry();
         const std::vector<std::string> installedLayouts = installedLanguageService_.listInstalledLayoutCodes();
         const ghost::core::ScanResult scanResult = layoutFixService_.scan(registryLayouts, installedLayouts);
+        const std::size_t stepsBeforeCleanup = fixReport.executedSteps.size();
+        const std::size_t errorsBeforeCleanup = fixReport.errors.size();
+
+        if (scanResult.ghostLayouts.empty())
+        {
+            fixReport.executedSteps.push_back("registry cleanup skipped: ghost layout not found after add/remove");
+        }
+        else
+        {
+            const std::vector<ghost::platform::RegistryMatch> actualMatches =
+                registryService_.findLayoutMatches(*options.layoutCode);
+            fixReport.executedSteps.push_back(
+                "registry cleanup matches: " + std::to_string(actualMatches.size()));
+            const std::vector<std::string> cleanupErrors = registryService_.deleteMatches(actualMatches);
+            fixReport.errors.insert(fixReport.errors.end(), cleanupErrors.begin(), cleanupErrors.end());
+        }
+
+        fixReport.success = fixReport.errors.empty();
+
+        for (std::size_t index = stepsBeforeCleanup; index < fixReport.executedSteps.size(); ++index)
+        {
+            printer_.print("[fix] step: " + fixReport.executedSteps[index]);
+        }
+        for (std::size_t index = errorsBeforeCleanup; index < fixReport.errors.size(); ++index)
+        {
+            printer_.print("[fix] error: " + fixReport.errors[index]);
+        }
+
         printer_.print("[fix] post-scan ghost layouts: " + joinLayouts(scanResult.ghostLayouts));
         printer_.print("[fix] recommendation: reboot or sign out to apply language switcher state");
 

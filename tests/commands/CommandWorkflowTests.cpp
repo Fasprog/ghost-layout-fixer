@@ -256,12 +256,9 @@ bool testLayoutFixFailurePathsAndScanCases()
     runner.rules.push_back({"powershell", 1, "powershell failed"});
     runner.rules.push_back({"reg delete", 1, "delete failed"});
 
-    const ghost::platform::RegistryService registryService(&runner);
     const ghost::core::LayoutFixService layoutFixService(&runner);
-    const std::vector<ghost::platform::RegistryMatch> matches = {{"HKEY_CURRENT_USER\\Keyboard Layout\\Preload", "1", "00000409"}};
-
     const ghost::core::FixReport fixReport =
-        layoutFixService.executeFix("en-US", matches, "backup.reg", registryService);
+        layoutFixService.executeFix("en-US", "backup.reg");
 
     const ghost::core::ScanResult emptyGhostScan =
         layoutFixService.scan({"EN_us", "ru"}, {"en-US", "ru-RU"});
