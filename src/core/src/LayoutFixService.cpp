@@ -142,7 +142,7 @@ FixReport LayoutFixService::executeFix(
     report.backupPath = backupPath;
     report.executedSteps.push_back("backup created: " + backupPath);
 
-    if (!isValidLanguageTag(layoutCode))
+    if (!isValidLayoutCode(layoutCode))
     {
         report.errors.push_back("invalid layout code format: " + layoutCode);
         report.success = false;
@@ -171,6 +171,11 @@ FixReport LayoutFixService::executeFix(
 
     report.success = report.errors.empty();
     return report;
+}
+
+bool LayoutFixService::isValidLayoutCode(const std::string& layoutCode) const
+{
+    return isValidLanguageTag(layoutCode);
 }
 
 } // namespace ghost::core
