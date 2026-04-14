@@ -8,6 +8,7 @@
 #include <src/platform/RegistryService.h>
 #include <src/platform/SystemCommandRunner.h>
 #include <src/report/ReportPrinter.h>
+#include <src/platform/RegistryBranches.h>
 
 #include <filesystem>
 #include <fstream>
@@ -159,7 +160,7 @@ bool testBackupAggregatesAllBranches()
 
     bool ok = true;
     ok = expect(report.success, "backup succeeds when all exports succeed") && ok;
-    ok = expect(runner.commands.size() == 5, "backup exports all required registry branches") && ok;
+    ok = expect(runner.commands.size() == ghost::platform::kRegistryBranches.size(), "backup exports all configured registry branches") && ok;
     ok = expect(content.find("Windows Registry Editor Version 5.00") != std::string::npos, "merged backup contains registry header") && ok;
     ok = expect(
              content.find("Windows Registry Editor Version 5.00", content.find("Windows Registry Editor Version 5.00") + 1) ==
