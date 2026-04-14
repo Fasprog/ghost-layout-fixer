@@ -144,7 +144,7 @@ FixReport LayoutFixService::executeFix(
 
     if (!isValidLayoutCode(layoutCode))
     {
-        report.errors.push_back("invalid layout code format: " + layoutCode);
+        report.errors.push_back("invalid layout code: " + layoutCode);
         report.success = false;
         return report;
     }
@@ -175,7 +175,15 @@ FixReport LayoutFixService::executeFix(
 
 bool LayoutFixService::isValidLayoutCode(const std::string& layoutCode) const
 {
-    return isValidLanguageTag(layoutCode);
+    if (!isValidLanguageTag(layoutCode))
+    {
+        return false;
+    }
+
+    const std::string validateCommand =
+        "powershell -NoProfile -Command \"[System.Globalization.CultureInfo]::GetCultureInfo('" + layoutCode + "') | Out-Null\"";
+    const ghost::platform::CommandResult validateResult = runner_->run(validateCommand);
+    return validateResult.exitCode == 0;
 }
 
 } // namespace ghost::core

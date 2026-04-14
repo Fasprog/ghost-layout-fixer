@@ -127,6 +127,21 @@ bool expect(bool condition, const std::string& message)
     return true;
 }
 
+std::size_t countCommandsContaining(
+    const std::vector<std::string>& commands,
+    const std::string& token)
+{
+    std::size_t count = 0;
+    for (const std::string& command : commands)
+    {
+        if (command.find(token) != std::string::npos)
+        {
+            ++count;
+        }
+    }
+    return count;
+}
+
 bool testBackupPathFormat()
 {
     const ghost::core::BackupService backupService;
@@ -313,6 +328,9 @@ bool testCliAndNoAdmin()
     runner.rules.push_back({"reg export", 0, "ok"});
     runner.rules.push_back({"reg import", 0, "ok"});
     runner.rules.push_back({"GetCultures", 0, "0409=en-US\n"});
+    runner.rules.push_back({"GetCultureInfo('en-US')", 0, "ok"});
+    runner.rules.push_back({"GetCultureInfo('dp-D0')", 1, "culture missing"});
+    runner.rules.push_back({"GetCultureInfo('dr-Dp')", 1, "culture missing"});
     runner.rules.push_back({"reg query", 0, "    1    REG_SZ    00000409\n"});
     runner.rules.push_back({"powershell", 0, "ok"});
 
@@ -355,10 +373,17 @@ bool testCliAndNoAdmin()
 
     ghost::cli::CliOptions invalidFixOptions;
     invalidFixOptions.command = ghost::cli::CommandType::Fix;
-    invalidFixOptions.layoutCode = "dr-Dp";
+    invalidFixOptions.layoutCode = "dp-D0";
     const std::size_t invalidFixCommandsBefore = runner.commands.size();
     const int invalidFixCode = app.run(invalidFixOptions);
     const std::size_t invalidFixCommandsAfter = runner.commands.size();
+
+    ghost::cli::CliOptions invalidFixOptionsSecond;
+    invalidFixOptionsSecond.command = ghost::cli::CommandType::Fix;
+    invalidFixOptionsSecond.layoutCode = "dr-Dp";
+    const std::size_t invalidFixCommandsSecondBefore = runner.commands.size();
+    const int invalidFixCodeSecond = app.run(invalidFixOptionsSecond);
+    const std::size_t invalidFixCommandsSecondAfter = runner.commands.size();
 
     ghost::cli::CliOptions invalidDryRunOptions;
     invalidDryRunOptions.command = ghost::cli::CommandType::Fix;
@@ -374,8 +399,30 @@ bool testCliAndNoAdmin()
                 "application blocks dangerous operations without admin") && ok;
     ok = expect(fixCode == static_cast<int>(ghost::core::ExitCode::Success), "fix executes") && ok;
     ok = expect(commandsAfter > commandsBefore, "fix executes system commands") && ok;
-    ok = expect(invalidFixCode == static_cast<int>(ghost::core::ExitCode::FixError), "fix fails fast on invalid layout code") && ok;
-    ok = expect(invalidFixCommandsAfter == invalidFixCommandsBefore, "invalid fix does not run backup or system commands") && ok;
+    ok = expect(invalidFixCode == static_cast<int>(ghost::core::ExitCode::FixError), "fix fails on invalid culture tag dp-D0") && ok;
+    ok = expect(invalidFixCommandsAfter == invalidFixCommandsBefore + 1, "invalid dp-D0 fix only runs culture validation command") && ok;
+    ok = expect(
+             countCommandsContaining(runner.commands, "GetCultureInfo('dp-D0')") == 1,
+             "invalid dp-D0 triggers CultureInfo validation") &&
+        ok;
+    ok = expect(
+             countCommandsContaining(runner.commands, "Set-WinUserLanguageList") == 2,
+             "invalid dp-D0 does not run add/remove fix commands") &&
+        ok;
+    ok = expect(
+             countCommandsContaining(runner.commands, "reg export") == ghost::platform::kRegistryBranches.size(),
+             "invalid dp-D0 does not create additional backup exports") &&
+        ok;
+    ok = expect(invalidFixCodeSecond == static_cast<int>(ghost::core::ExitCode::FixError), "fix fails on invalid culture tag dr-Dp") && ok;
+    ok = expect(invalidFixCommandsSecondAfter == invalidFixCommandsSecondBefore + 1, "invalid dr-Dp fix only runs culture validation command") && ok;
+    ok = expect(
+             countCommandsContaining(runner.commands, "GetCultureInfo('dr-Dp')") == 1,
+             "invalid dr-Dp triggers CultureInfo validation") &&
+        ok;
+    ok = expect(
+             countCommandsContaining(runner.commands, "reg export") == ghost::platform::kRegistryBranches.size(),
+             "invalid dr-Dp does not create additional backup exports") &&
+        ok;
     ok = expect(invalidDryRunCode == static_cast<int>(ghost::core::ExitCode::FixError), "dry-run fails fast on invalid layout code") && ok;
     ok = expect(invalidDryRunCommandsAfter == invalidDryRunCommandsBefore, "invalid dry-run does not build plan through registry commands") && ok;
     return ok;
