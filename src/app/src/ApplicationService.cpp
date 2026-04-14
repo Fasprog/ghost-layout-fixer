@@ -148,6 +148,14 @@ int ApplicationService::run(const ghost::cli::CliOptions& options) const
             return static_cast<int>(ghost::core::ExitCode::FixError);
         }
 
+        const std::vector<std::string> registryLayouts = registryService_.listLayoutCodesFromRegistry();
+        const std::vector<std::string> installedLayouts = installedLanguageService_.listInstalledLayoutCodes();
+        if (!layoutFixService_.isGhostLayout(*options.layoutCode, registryLayouts, installedLayouts))
+        {
+            printer_.print("[fix --dry-run] error: requested layout is not a ghost layout: " + *options.layoutCode);
+            return static_cast<int>(ghost::core::ExitCode::FixError);
+        }
+
         const std::string backupPath = backupService_.makeBackupPath();
         const std::vector<ghost::platform::RegistryMatch> matches = registryService_.findLayoutMatches(*options.layoutCode);
         const ghost::core::FixPlan plan = layoutFixService_.buildDryRunPlan(*options.layoutCode, toMatchSummaries(matches), backupPath);
@@ -172,6 +180,14 @@ int ApplicationService::run(const ghost::cli::CliOptions& options) const
         if (!layoutFixService_.isValidLayoutCode(*options.layoutCode))
         {
             printer_.print("[fix] error: invalid layout code: " + *options.layoutCode);
+            return static_cast<int>(ghost::core::ExitCode::FixError);
+        }
+
+        const std::vector<std::string> registryLayouts = registryService_.listLayoutCodesFromRegistry();
+        const std::vector<std::string> installedLayouts = installedLanguageService_.listInstalledLayoutCodes();
+        if (!layoutFixService_.isGhostLayout(*options.layoutCode, registryLayouts, installedLayouts))
+        {
+            printer_.print("[fix] error: requested layout is not a ghost layout: " + *options.layoutCode);
             return static_cast<int>(ghost::core::ExitCode::FixError);
         }
 
