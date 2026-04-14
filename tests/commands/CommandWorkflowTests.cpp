@@ -352,12 +352,31 @@ bool testCliAndNoAdmin()
     const int fixCode = app.run(fixOptions);
     const std::size_t commandsAfter = runner.commands.size();
 
+    ghost::cli::CliOptions invalidFixOptions;
+    invalidFixOptions.command = ghost::cli::CommandType::Fix;
+    invalidFixOptions.layoutCode = "dr-Dp";
+    const std::size_t invalidFixCommandsBefore = runner.commands.size();
+    const int invalidFixCode = app.run(invalidFixOptions);
+    const std::size_t invalidFixCommandsAfter = runner.commands.size();
+
+    ghost::cli::CliOptions invalidDryRunOptions;
+    invalidDryRunOptions.command = ghost::cli::CommandType::Fix;
+    invalidDryRunOptions.layoutCode = "invalid!";
+    invalidDryRunOptions.dryRun = true;
+    const std::size_t invalidDryRunCommandsBefore = runner.commands.size();
+    const int invalidDryRunCode = app.run(invalidDryRunOptions);
+    const std::size_t invalidDryRunCommandsAfter = runner.commands.size();
+
     bool ok = true;
     ok = expect(!invalidOptions.parseErrors.empty(), "parser returns conflicts for invalid args") && ok;
     ok = expect(noAdminCode == static_cast<int>(ghost::core::ExitCode::InsufficientPrivileges), 
                 "application blocks dangerous operations without admin") && ok;
     ok = expect(fixCode == static_cast<int>(ghost::core::ExitCode::Success), "fix executes") && ok;
     ok = expect(commandsAfter > commandsBefore, "fix executes system commands") && ok;
+    ok = expect(invalidFixCode == static_cast<int>(ghost::core::ExitCode::FixError), "fix fails fast on invalid layout code") && ok;
+    ok = expect(invalidFixCommandsAfter == invalidFixCommandsBefore, "invalid fix does not run backup or system commands") && ok;
+    ok = expect(invalidDryRunCode == static_cast<int>(ghost::core::ExitCode::FixError), "dry-run fails fast on invalid layout code") && ok;
+    ok = expect(invalidDryRunCommandsAfter == invalidDryRunCommandsBefore, "invalid dry-run does not build plan through registry commands") && ok;
     return ok;
 }
 

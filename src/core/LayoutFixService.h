@@ -39,6 +39,9 @@ public:
         const std::string& layoutCode,
         const std::string& backupPath) const;
 
+    /// @brief Проверяет корректность формата language tag для fix.
+    bool isValidLayoutCode(const std::string& layoutCode) const;
+
 private:
     const ghost::platform::ICommandRunner* runner_;
 };
