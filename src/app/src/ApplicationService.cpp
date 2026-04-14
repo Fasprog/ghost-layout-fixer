@@ -233,10 +233,6 @@ int ApplicationService::run(const ghost::cli::CliOptions& options) const
         }
 
         const ghost::core::RestoreReport restoreReport = backupService_.restoreBackup(*options.restoreFile);
-        for (const std::string& command : restoreReport.executedCommands)
-        {
-            printer_.print("[restore] command: " + command);
-        }
         for (const std::string& error : restoreReport.errors)
         {
             printer_.print("[restore] error: " + error);
