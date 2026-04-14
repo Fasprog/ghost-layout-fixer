@@ -142,9 +142,9 @@ FixReport LayoutFixService::executeFix(
     report.backupPath = backupPath;
     report.executedSteps.push_back("backup created: " + backupPath);
 
-    if (!isValidLayoutCode(layoutCode))
+    if (!isValidLayoutCodeFormat(layoutCode))
     {
-        report.errors.push_back("invalid layout code format: " + layoutCode);
+        report.errors.push_back("invalid layout code: " + layoutCode);
         report.success = false;
         return report;
     }
@@ -174,6 +174,21 @@ FixReport LayoutFixService::executeFix(
 }
 
 bool LayoutFixService::isValidLayoutCode(const std::string& layoutCode) const
+{
+    if (!isValidLayoutCodeFormat(layoutCode))
+    {
+        return false;
+    }
+
+    const std::string validateCommand =
+        "powershell -NoProfile -Command \"$layout = '" + layoutCode +
+        "'; $match = [System.Globalization.CultureInfo]::GetCultures([System.Globalization.CultureTypes]::SpecificCultures) | "
+        "Where-Object { $_.Name -ieq $layout } | Select-Object -First 1; if ($null -eq $match) { exit 1 }\"";
+    const ghost::platform::CommandResult validateResult = runner_->run(validateCommand);
+    return validateResult.exitCode == 0;
+}
+
+bool LayoutFixService::isValidLayoutCodeFormat(const std::string& layoutCode) const
 {
     return isValidLanguageTag(layoutCode);
 }

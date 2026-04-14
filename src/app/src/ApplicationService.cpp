@@ -144,7 +144,7 @@ int ApplicationService::run(const ghost::cli::CliOptions& options) const
 
         if (!layoutFixService_.isValidLayoutCode(*options.layoutCode))
         {
-            printer_.print("[fix --dry-run] error: invalid layout code format: " + *options.layoutCode);
+            printer_.print("[fix --dry-run] error: invalid layout code: " + *options.layoutCode);
             return static_cast<int>(ghost::core::ExitCode::FixError);
         }
 
@@ -171,7 +171,7 @@ int ApplicationService::run(const ghost::cli::CliOptions& options) const
 
         if (!layoutFixService_.isValidLayoutCode(*options.layoutCode))
         {
-            printer_.print("[fix] error: invalid layout code format: " + *options.layoutCode);
+            printer_.print("[fix] error: invalid layout code: " + *options.layoutCode);
             return static_cast<int>(ghost::core::ExitCode::FixError);
         }
 
