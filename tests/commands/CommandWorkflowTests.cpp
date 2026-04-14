@@ -79,9 +79,10 @@ struct FakeCommandRunner final : ghost::platform::ICommandRunner
                 const std::string branch = extractQuoted(command, 0);
                 const std::string file = extractQuoted(command, 1);
                 std::ofstream out(file, std::ios::binary | std::ios::trunc);
-                out << "Windows Registry Editor Version 5.00\r\n\r\n";
-                out << "[" << branch << "]\r\n";
-                out << "\"1\"=\"00000409\"\r\n";
+                const std::u16string payload = u"\uFEFFWindows Registry Editor Version 5.00\r\n\r\n[" +
+                                               std::u16string(branch.begin(), branch.end()) +
+                                               u"]\r\n\"1\"=\"00000409\"\r\n";
+                out.write(reinterpret_cast<const char*>(payload.data()), static_cast<std::streamsize>(payload.size() * sizeof(char16_t)));
             }
 
             return ghost::platform::CommandResult{rule.exitCode, rule.output};
@@ -90,6 +91,30 @@ struct FakeCommandRunner final : ghost::platform::ICommandRunner
         return ghost::platform::CommandResult{};
     }
 };
+
+std::string decodeUtf16LeFile(const std::filesystem::path& path)
+{
+    std::ifstream in(path, std::ios::binary);
+    const std::string bytes((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+    if (bytes.size() < 2 || static_cast<unsigned char>(bytes[0]) != 0xFF || static_cast<unsigned char>(bytes[1]) != 0xFE)
+    {
+        return {};
+    }
+
+    std::string decoded;
+    decoded.reserve(bytes.size() / 2);
+    for (std::size_t i = 2; i + 1 < bytes.size(); i += 2)
+    {
+        const unsigned char lo = static_cast<unsigned char>(bytes[i]);
+        const unsigned char hi = static_cast<unsigned char>(bytes[i + 1]);
+        if (hi == 0)
+        {
+            decoded.push_back(static_cast<char>(lo));
+        }
+    }
+
+    return decoded;
+}
 
 bool expect(bool condition, const std::string& message)
 {
@@ -130,13 +155,17 @@ bool testBackupAggregatesAllBranches()
     const std::filesystem::path backupPath = std::filesystem::temp_directory_path() / "ghost-layout-fixer-backup.reg";
     const ghost::core::BackupReport report = backupService.createBackup(backupPath.string());
 
-    std::ifstream in(backupPath, std::ios::binary);
-    std::string content((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+    const std::string content = decodeUtf16LeFile(backupPath);
 
     bool ok = true;
     ok = expect(report.success, "backup succeeds when all exports succeed") && ok;
     ok = expect(runner.commands.size() == 5, "backup exports all required registry branches") && ok;
     ok = expect(content.find("Windows Registry Editor Version 5.00") != std::string::npos, "merged backup contains registry header") && ok;
+    ok = expect(
+             content.find("Windows Registry Editor Version 5.00", content.find("Windows Registry Editor Version 5.00") + 1) ==
+                 std::string::npos,
+             "merged backup contains exactly one registry header") &&
+        ok;
     ok = expect(content.find("HKEY_CURRENT_USER\\Keyboard Layout\\Preload") != std::string::npos, "backup contains preload branch") && ok;
     ok = expect(content.find("HKEY_CURRENT_USER\\Control Panel\\International\\User Profile") != std::string::npos, "backup contains user profile branch") && ok;
 
