@@ -120,10 +120,6 @@ int ApplicationService::run(const ghost::cli::CliOptions& options) const
     {
         const std::string backupPath = backupService_.makeBackupPath();
         const ghost::core::BackupReport report = backupService_.createBackup(backupPath);
-        for (const std::string& command : report.executedCommands)
-        {
-            printer_.print("[backup] command: " + command);
-        }
         if (!report.success)
         {
             for (const std::string& error : report.errors)
@@ -169,11 +165,6 @@ int ApplicationService::run(const ghost::cli::CliOptions& options) const
 
         const std::string backupPath = backupService_.makeBackupPath();
         const ghost::core::BackupReport backupReport = backupService_.createBackup(backupPath);
-        for (const std::string& command : backupReport.executedCommands)
-        {
-            printer_.print("[fix] backup command: " + command);
-        }
-
         if (!backupReport.success)
         {
             for (const std::string& error : backupReport.errors)
@@ -183,72 +174,52 @@ int ApplicationService::run(const ghost::cli::CliOptions& options) const
             return static_cast<int>(ghost::core::ExitCode::BackupError);
         }
 
+        printer_.print("[fix] layout: " + *options.layoutCode);
+        printer_.print("[fix] backup: " + backupReport.backupPath);
+
         ghost::core::FixReport fixReport = layoutFixService_.executeFix(*options.layoutCode, backupPath);
-        for (const std::string& step : fixReport.executedSteps)
+        printer_.print(
+            std::string("[fix] standard add/remove: ") +
+            (fixReport.errors.empty() ? "completed" : "failed"));
+
+        const std::vector<ghost::platform::RegistryMatch> actualMatches =
+            registryService_.findLayoutMatches(*options.layoutCode);
+
+        if (actualMatches.empty())
         {
-            printer_.print("[fix] step: " + step);
+            printer_.print("[fix] registry cleanup: skipped, no matches after add/remove");
         }
+        else
+        {
+            const std::size_t cleanupCount = actualMatches.size();
+            const std::vector<std::string> cleanupErrors = registryService_.deleteMatches(actualMatches);
+            fixReport.errors.insert(fixReport.errors.end(), cleanupErrors.begin(), cleanupErrors.end());
+
+            printer_.print(
+                std::string("[fix] registry cleanup: ") +
+                (cleanupErrors.empty()
+                    ? "removed " + std::to_string(cleanupCount) + " entries"
+                    : "failed"));
+        }
+
+        const std::vector<ghost::platform::RegistryMatch> finalTargetMatches =
+            registryService_.findLayoutMatches(*options.layoutCode);
+
+        fixReport.success = fixReport.errors.empty() && finalTargetMatches.empty();
+
         for (const std::string& error : fixReport.errors)
         {
             printer_.print("[fix] error: " + error);
         }
 
-        const std::vector<std::string> registryLayouts = registryService_.listLayoutCodesFromRegistry();
-        const std::vector<std::string> installedLayouts = installedLanguageService_.listInstalledLayoutCodes();
-        const ghost::core::ScanResult scanResult = layoutFixService_.scan(registryLayouts, installedLayouts);
-        ghost::core::ScanResult finalScanResult = scanResult;
-        const std::size_t stepsBeforeCleanup = fixReport.executedSteps.size();
-        const std::size_t errorsBeforeCleanup = fixReport.errors.size();
-        const std::vector<ghost::platform::RegistryMatch> actualMatches = registryService_.findLayoutMatches(*options.layoutCode);
-
-        if (actualMatches.empty())
-        {
-            fixReport.executedSteps.push_back("registry cleanup skipped: no matches for requested layout after add/remove");
-        }
-        else
-        {
-            fixReport.executedSteps.push_back("registry cleanup matches: " + std::to_string(actualMatches.size()));
-            const std::vector<std::string> cleanupErrors = registryService_.deleteMatches(actualMatches);
-            fixReport.errors.insert(fixReport.errors.end(), cleanupErrors.begin(), cleanupErrors.end());
-
-            const std::vector<std::string> registryLayoutsAfterCleanup = registryService_.listLayoutCodesFromRegistry();
-            const std::vector<std::string> installedLayoutsAfterCleanup = installedLanguageService_.listInstalledLayoutCodes();
-            finalScanResult = layoutFixService_.scan(registryLayoutsAfterCleanup, installedLayoutsAfterCleanup);
-            if (!finalScanResult.ghostLayouts.empty())
-            {
-                fixReport.executedSteps.push_back("registry cleanup completed but other ghost layout is still present");
-            }
-        }
-
-        const std::vector<ghost::platform::RegistryMatch> finalTargetMatches = registryService_.findLayoutMatches(*options.layoutCode);
-        if (finalTargetMatches.empty())
-        {
-            fixReport.executedSteps.push_back("target layout removed successfully");
-        }
-        else
-        {
-            fixReport.executedSteps.push_back("requested layout is still present after cleanup");
-        }
-
-        fixReport.success = fixReport.errors.empty() && finalTargetMatches.empty();
-
-        for (std::size_t index = stepsBeforeCleanup; index < fixReport.executedSteps.size(); ++index)
-        {
-            printer_.print("[fix] step: " + fixReport.executedSteps[index]);
-        }
-        for (std::size_t index = errorsBeforeCleanup; index < fixReport.errors.size(); ++index)
-        {
-            printer_.print("[fix] error: " + fixReport.errors[index]);
-        }
-
-        printer_.print("[fix] post-scan ghost layouts: " + joinLayouts(finalScanResult.ghostLayouts));
-        printer_.print("[fix] recommendation: reboot or sign out to apply language switcher state");
+        printer_.print(std::string("[fix] result: ") + (fixReport.success ? "success" : "failed"));
 
         if (!fixReport.success)
         {
             return static_cast<int>(ghost::core::ExitCode::FixError);
         }
 
+        printer_.print("[fix] recommendation: reboot or sign out to apply language switcher state");
         return static_cast<int>(ghost::core::ExitCode::Success);
     }
 
