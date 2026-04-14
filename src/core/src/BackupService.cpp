@@ -73,25 +73,13 @@ bool isSafePathForCommand(const std::string& path)
 
 std::filesystem::path executableDirectory()
 {
-    std::wstring buffer(static_cast<std::size_t>(MAX_PATH), L'\0');
-    DWORD copied = 0;
-    while (true)
+    wchar_t buffer[MAX_PATH] = {};
+    const DWORD length = GetModuleFileNameW(nullptr, buffer, MAX_PATH);
+    if (length == 0 || length == MAX_PATH)
     {
-        copied = GetModuleFileNameW(nullptr, buffer.data(), static_cast<DWORD>(buffer.size()));
-        if (copied == 0)
-        {
-            return {};
-        }
-
-        if (copied < buffer.size() - 1)
-        {
-            break;
-        }
-
-        buffer.resize(buffer.size() * 2);
+        return {};
     }
 
-    buffer.resize(copied);
     return std::filesystem::path(buffer).parent_path();
 }
 

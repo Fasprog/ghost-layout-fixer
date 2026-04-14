@@ -147,10 +147,8 @@ int ApplicationService::run(const ghost::cli::CliOptions& options) const
         }
 
         const std::string backupPath = backupService_.makeBackupPath();
-        const std::vector<ghost::platform::RegistryMatch> matches =
-            registryService_.findLayoutMatches(*options.layoutCode);
-        const ghost::core::FixPlan plan =
-            layoutFixService_.buildDryRunPlan(*options.layoutCode, toMatchSummaries(matches), backupPath);
+        const std::vector<ghost::platform::RegistryMatch> matches = registryService_.findLayoutMatches(*options.layoutCode);
+        const ghost::core::FixPlan plan = layoutFixService_.buildDryRunPlan(*options.layoutCode, toMatchSummaries(matches), backupPath);
 
         printer_.print("[fix --dry-run] layout: " + *options.layoutCode);
         for (const std::string& step : plan.plannedSteps)
@@ -185,9 +183,7 @@ int ApplicationService::run(const ghost::cli::CliOptions& options) const
             return static_cast<int>(ghost::core::ExitCode::BackupError);
         }
 
-        ghost::core::FixReport fixReport =
-            layoutFixService_.executeFix(*options.layoutCode, backupPath);
-
+        ghost::core::FixReport fixReport = layoutFixService_.executeFix(*options.layoutCode, backupPath);
         for (const std::string& step : fixReport.executedSteps)
         {
             printer_.print("[fix] step: " + step);
@@ -203,36 +199,28 @@ int ApplicationService::run(const ghost::cli::CliOptions& options) const
         ghost::core::ScanResult finalScanResult = scanResult;
         const std::size_t stepsBeforeCleanup = fixReport.executedSteps.size();
         const std::size_t errorsBeforeCleanup = fixReport.errors.size();
-        const std::vector<ghost::platform::RegistryMatch> actualMatches =
-            registryService_.findLayoutMatches(*options.layoutCode);
+        const std::vector<ghost::platform::RegistryMatch> actualMatches = registryService_.findLayoutMatches(*options.layoutCode);
 
         if (actualMatches.empty())
         {
-            fixReport.executedSteps.push_back(
-                "registry cleanup skipped: no matches for requested layout after add/remove");
+            fixReport.executedSteps.push_back("registry cleanup skipped: no matches for requested layout after add/remove");
         }
         else
         {
-            fixReport.executedSteps.push_back(
-                "registry cleanup matches: " + std::to_string(actualMatches.size()));
+            fixReport.executedSteps.push_back("registry cleanup matches: " + std::to_string(actualMatches.size()));
             const std::vector<std::string> cleanupErrors = registryService_.deleteMatches(actualMatches);
             fixReport.errors.insert(fixReport.errors.end(), cleanupErrors.begin(), cleanupErrors.end());
 
-            const std::vector<std::string> registryLayoutsAfterCleanup =
-                registryService_.listLayoutCodesFromRegistry();
-            const std::vector<std::string> installedLayoutsAfterCleanup =
-                installedLanguageService_.listInstalledLayoutCodes();
-            finalScanResult =
-                layoutFixService_.scan(registryLayoutsAfterCleanup, installedLayoutsAfterCleanup);
+            const std::vector<std::string> registryLayoutsAfterCleanup = registryService_.listLayoutCodesFromRegistry();
+            const std::vector<std::string> installedLayoutsAfterCleanup = installedLanguageService_.listInstalledLayoutCodes();
+            finalScanResult = layoutFixService_.scan(registryLayoutsAfterCleanup, installedLayoutsAfterCleanup);
             if (!finalScanResult.ghostLayouts.empty())
             {
-                fixReport.executedSteps.push_back(
-                    "registry cleanup completed but ghost layout is still present");
+                fixReport.executedSteps.push_back("registry cleanup completed but other ghost layout is still present");
             }
         }
 
-        const std::vector<ghost::platform::RegistryMatch> finalTargetMatches =
-            registryService_.findLayoutMatches(*options.layoutCode);
+        const std::vector<ghost::platform::RegistryMatch> finalTargetMatches = registryService_.findLayoutMatches(*options.layoutCode);
         if (finalTargetMatches.empty())
         {
             fixReport.executedSteps.push_back("target layout removed successfully");

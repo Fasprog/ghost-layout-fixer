@@ -59,8 +59,7 @@ bool isInstalled(
 
 bool isValidLanguageTag(const std::string& value)
 {
-    static const std::regex kLanguageTagPattern(
-        "^[A-Za-z]{2,3}(?:-[A-Za-z0-9]{2,8})*$");
+    static const std::regex kLanguageTagPattern("^[A-Za-z]{2,3}(?:-[A-Za-z0-9]{2,8})*$");
     return std::regex_match(value, kLanguageTagPattern);
 }
 
@@ -150,11 +149,9 @@ FixReport LayoutFixService::executeFix(
         return report;
     }
 
-    const std::string addCommand =
-        "powershell -NoProfile -Command \"$list = Get-WinUserLanguageList; "
-        "if (-not ($list.LanguageTag -contains '" +
-        layoutCode + "')) { $list.Add('" + layoutCode +
-        "'); Set-WinUserLanguageList $list -Force }\"";
+    const std::string addCommand = "powershell -NoProfile -Command \"$list = Get-WinUserLanguageList; "
+                                   "if (-not ($list.LanguageTag -contains '" + layoutCode + "')) { $list.Add('" + layoutCode +
+                                    "'); Set-WinUserLanguageList $list -Force }\"";
     const ghost::platform::CommandResult addResult = runner_->run(addCommand);
     report.executedSteps.push_back("standard add command: " + addCommand);
     if (addResult.exitCode != 0)
@@ -162,10 +159,9 @@ FixReport LayoutFixService::executeFix(
         report.errors.push_back("standard add failed: " + addResult.outputText);
     }
 
-    const std::string removeCommand =
-        "powershell -NoProfile -Command \"$list = Get-WinUserLanguageList; "
-        "$filtered = @($list | Where-Object { $_.LanguageTag -ne '" +
-        layoutCode + "' }); Set-WinUserLanguageList $filtered -Force\"";
+    const std::string removeCommand = "powershell -NoProfile -Command \"$list = Get-WinUserLanguageList; "
+                                      "$filtered = @($list | Where-Object { $_.LanguageTag -ne '" +
+                                      layoutCode + "' }); Set-WinUserLanguageList $filtered -Force\"";
     const ghost::platform::CommandResult removeResult = runner_->run(removeCommand);
     report.executedSteps.push_back("standard remove command: " + removeCommand);
     if (removeResult.exitCode != 0)
