@@ -142,7 +142,7 @@ FixReport LayoutFixService::executeFix(
     report.backupPath = backupPath;
     report.executedSteps.push_back("backup created: " + backupPath);
 
-    if (!isValidLayoutCode(layoutCode))
+    if (!isValidLayoutCodeFormat(layoutCode))
     {
         report.errors.push_back("invalid layout code: " + layoutCode);
         report.success = false;
@@ -175,7 +175,7 @@ FixReport LayoutFixService::executeFix(
 
 bool LayoutFixService::isValidLayoutCode(const std::string& layoutCode) const
 {
-    if (!isValidLanguageTag(layoutCode))
+    if (!isValidLayoutCodeFormat(layoutCode))
     {
         return false;
     }
@@ -184,6 +184,11 @@ bool LayoutFixService::isValidLayoutCode(const std::string& layoutCode) const
         "powershell -NoProfile -Command \"[System.Globalization.CultureInfo]::GetCultureInfo('" + layoutCode + "') | Out-Null\"";
     const ghost::platform::CommandResult validateResult = runner_->run(validateCommand);
     return validateResult.exitCode == 0;
+}
+
+bool LayoutFixService::isValidLayoutCodeFormat(const std::string& layoutCode) const
+{
+    return isValidLanguageTag(layoutCode);
 }
 
 } // namespace ghost::core

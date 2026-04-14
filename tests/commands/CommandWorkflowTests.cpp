@@ -399,6 +399,10 @@ bool testCliAndNoAdmin()
                 "application blocks dangerous operations without admin") && ok;
     ok = expect(fixCode == static_cast<int>(ghost::core::ExitCode::Success), "fix executes") && ok;
     ok = expect(commandsAfter > commandsBefore, "fix executes system commands") && ok;
+    ok = expect(
+             countCommandsContaining(runner.commands, "GetCultureInfo('en-US')") == 1,
+             "valid en-US fix runs CultureInfo validation once before backup/fix") &&
+        ok;
     ok = expect(invalidFixCode == static_cast<int>(ghost::core::ExitCode::FixError), "fix fails on invalid culture tag dp-D0") && ok;
     ok = expect(invalidFixCommandsAfter == invalidFixCommandsBefore + 1, "invalid dp-D0 fix only runs culture validation command") && ok;
     ok = expect(
@@ -425,6 +429,10 @@ bool testCliAndNoAdmin()
         ok;
     ok = expect(invalidDryRunCode == static_cast<int>(ghost::core::ExitCode::FixError), "dry-run fails fast on invalid layout code") && ok;
     ok = expect(invalidDryRunCommandsAfter == invalidDryRunCommandsBefore, "invalid dry-run does not build plan through registry commands") && ok;
+    ok = expect(
+             countCommandsContaining(runner.commands, "GetCultureInfo(") == 3,
+             "invalid! is rejected by regex and does not trigger CultureInfo validation") &&
+        ok;
     return ok;
 }
 
