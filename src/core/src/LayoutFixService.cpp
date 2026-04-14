@@ -181,7 +181,9 @@ bool LayoutFixService::isValidLayoutCode(const std::string& layoutCode) const
     }
 
     const std::string validateCommand =
-        "powershell -NoProfile -Command \"[System.Globalization.CultureInfo]::GetCultureInfo('" + layoutCode + "') | Out-Null\"";
+        "powershell -NoProfile -Command \"$layout = '" + layoutCode +
+        "'; $match = [System.Globalization.CultureInfo]::GetCultures([System.Globalization.CultureTypes]::SpecificCultures) | "
+        "Where-Object { $_.Name -ieq $layout } | Select-Object -First 1; if ($null -eq $match) { exit 1 }\"";
     const ghost::platform::CommandResult validateResult = runner_->run(validateCommand);
     return validateResult.exitCode == 0;
 }

@@ -328,9 +328,9 @@ bool testCliAndNoAdmin()
     runner.rules.push_back({"reg export", 0, "ok"});
     runner.rules.push_back({"reg import", 0, "ok"});
     runner.rules.push_back({"GetCultures", 0, "0409=en-US\n"});
-    runner.rules.push_back({"GetCultureInfo('en-US')", 0, "ok"});
-    runner.rules.push_back({"GetCultureInfo('dp-D0')", 1, "culture missing"});
-    runner.rules.push_back({"GetCultureInfo('dr-Dp')", 1, "culture missing"});
+    runner.rules.push_back({"$layout = 'en-US'", 0, "ok"});
+    runner.rules.push_back({"$layout = 'dp-D0'", 1, "culture missing"});
+    runner.rules.push_back({"$layout = 'dr-Dp'", 1, "culture missing"});
     runner.rules.push_back({"reg query", 0, "    1    REG_SZ    00000409\n"});
     runner.rules.push_back({"powershell", 0, "ok"});
 
@@ -400,14 +400,14 @@ bool testCliAndNoAdmin()
     ok = expect(fixCode == static_cast<int>(ghost::core::ExitCode::Success), "fix executes") && ok;
     ok = expect(commandsAfter > commandsBefore, "fix executes system commands") && ok;
     ok = expect(
-             countCommandsContaining(runner.commands, "GetCultureInfo('en-US')") == 1,
-             "valid en-US fix runs CultureInfo validation once before backup/fix") &&
+             countCommandsContaining(runner.commands, "$layout = 'en-US'") == 1,
+             "valid en-US fix runs SpecificCultures validation once before backup/fix") &&
         ok;
     ok = expect(invalidFixCode == static_cast<int>(ghost::core::ExitCode::FixError), "fix fails on invalid culture tag dp-D0") && ok;
     ok = expect(invalidFixCommandsAfter == invalidFixCommandsBefore + 1, "invalid dp-D0 fix only runs culture validation command") && ok;
     ok = expect(
-             countCommandsContaining(runner.commands, "GetCultureInfo('dp-D0')") == 1,
-             "invalid dp-D0 triggers CultureInfo validation") &&
+             countCommandsContaining(runner.commands, "$layout = 'dp-D0'") == 1,
+             "invalid dp-D0 triggers SpecificCultures validation") &&
         ok;
     ok = expect(
              countCommandsContaining(runner.commands, "Set-WinUserLanguageList") == 2,
@@ -420,8 +420,8 @@ bool testCliAndNoAdmin()
     ok = expect(invalidFixCodeSecond == static_cast<int>(ghost::core::ExitCode::FixError), "fix fails on invalid culture tag dr-Dp") && ok;
     ok = expect(invalidFixCommandsSecondAfter == invalidFixCommandsSecondBefore + 1, "invalid dr-Dp fix only runs culture validation command") && ok;
     ok = expect(
-             countCommandsContaining(runner.commands, "GetCultureInfo('dr-Dp')") == 1,
-             "invalid dr-Dp triggers CultureInfo validation") &&
+             countCommandsContaining(runner.commands, "$layout = 'dr-Dp'") == 1,
+             "invalid dr-Dp triggers SpecificCultures validation") &&
         ok;
     ok = expect(
              countCommandsContaining(runner.commands, "reg export") == ghost::platform::kRegistryBranches.size(),
@@ -430,8 +430,8 @@ bool testCliAndNoAdmin()
     ok = expect(invalidDryRunCode == static_cast<int>(ghost::core::ExitCode::FixError), "dry-run fails fast on invalid layout code") && ok;
     ok = expect(invalidDryRunCommandsAfter == invalidDryRunCommandsBefore, "invalid dry-run does not build plan through registry commands") && ok;
     ok = expect(
-             countCommandsContaining(runner.commands, "GetCultureInfo(") == 3,
-             "invalid! is rejected by regex and does not trigger CultureInfo validation") &&
+             countCommandsContaining(runner.commands, "GetCultures([System.Globalization.CultureTypes]::SpecificCultures)") == 3,
+             "invalid! is rejected by regex and does not trigger SpecificCultures validation") &&
         ok;
     return ok;
 }
