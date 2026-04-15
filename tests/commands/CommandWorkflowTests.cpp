@@ -319,6 +319,8 @@ bool testLayoutFixFailurePathsAndScanCases()
         layoutFixService.scan({"EN_us", "ru"}, {"en-US", "ru-RU"});
     const ghost::core::ScanResult ghostScan =
         layoutFixService.scan({"en-US", "de-DE"}, {"en-US"});
+    const bool enUsGhostWithOnlyEnGbInRegistry =
+        layoutFixService.isGhostLayout("en-US", {"en-GB"}, {"ru"});
     const bool ruRuGhostWithInstalledRu = layoutFixService.isGhostLayout("ru-RU", {"ru-RU"}, {"ru"});
     const bool deDeGhost = layoutFixService.isGhostLayout("de-DE", {"de-DE"}, {"en-US"});
 
@@ -327,6 +329,7 @@ bool testLayoutFixFailurePathsAndScanCases()
     ok = expect(!fixReport.errors.empty(), "fix returns failure details") && ok;
     ok = expect(emptyGhostScan.ghostLayouts.empty(), "scan handles mixed case and underscore normalization") && ok;
     ok = expect(ghostScan.ghostLayouts.size() == 1 && ghostScan.ghostLayouts.front() == "de-DE", "scan detects non-installed layout") && ok;
+    ok = expect(!enUsGhostWithOnlyEnGbInRegistry, "ghost check requires exact normalized layout match between request and registry") && ok;
     ok = expect(!ruRuGhostWithInstalledRu, "ghost check treats ru and ru-RU as the same installed language") && ok;
     ok = expect(deDeGhost, "ghost check returns true when layout exists in registry and is not installed") && ok;
     return ok;

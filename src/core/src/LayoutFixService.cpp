@@ -61,14 +61,7 @@ bool matchesRequestedLayout(
     const std::string& requestedLayout,
     const std::string& registryLayout)
 {
-    const std::string requestedNormalized = normalizeCode(requestedLayout);
-    const std::string registryNormalized = normalizeCode(registryLayout);
-    if (requestedNormalized == registryNormalized)
-    {
-        return true;
-    }
-
-    return primaryLanguageTag(requestedLayout) == primaryLanguageTag(registryLayout);
+    return normalizeCode(requestedLayout) == normalizeCode(registryLayout);
 }
 
 bool isValidLanguageTag(const std::string& value)
