@@ -45,6 +45,14 @@ public:
     /// @brief Проверяет format + существование language tag в CultureInfo.
     bool isValidLayoutCode(const std::string& layoutCode) const;
 
+    /// @brief Проверяет, что раскладка действительно ghost:
+    /// есть в реестре и отсутствует среди реально установленных языков
+    /// (с учетом normal/primary matching как в scan()).
+    bool isGhostLayout(
+        const std::string& layoutCode,
+        const std::vector<std::string>& registryLayouts,
+        const std::vector<std::string>& installedLayouts) const;
+
 private:
     const ghost::platform::ICommandRunner* runner_;
 };

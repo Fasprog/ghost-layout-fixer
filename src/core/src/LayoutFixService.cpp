@@ -57,6 +57,13 @@ bool isInstalled(
     return installedPrimaryCodes.find(registryPrimary) != installedPrimaryCodes.end();
 }
 
+bool matchesRequestedLayout(
+    const std::string& requestedLayout,
+    const std::string& registryLayout)
+{
+    return normalizeCode(requestedLayout) == normalizeCode(registryLayout);
+}
+
 bool isValidLanguageTag(const std::string& value)
 {
     static const std::regex kLanguageTagPattern("^[A-Za-z]{2,3}(?:-[A-Za-z0-9]{2,8})*$");
@@ -191,6 +198,35 @@ bool LayoutFixService::isValidLayoutCode(const std::string& layoutCode) const
 bool LayoutFixService::isValidLayoutCodeFormat(const std::string& layoutCode) const
 {
     return isValidLanguageTag(layoutCode);
+}
+
+bool LayoutFixService::isGhostLayout(
+    const std::string& layoutCode,
+    const std::vector<std::string>& registryLayouts,
+    const std::vector<std::string>& installedLayouts) const
+{
+    std::unordered_set<std::string> installedFullCodes;
+    std::unordered_set<std::string> installedPrimaryCodes;
+    for (const std::string& installedLayout : installedLayouts)
+    {
+        installedFullCodes.insert(normalizeCode(installedLayout));
+        installedPrimaryCodes.insert(primaryLanguageTag(installedLayout));
+    }
+
+    for (const std::string& registryLayout : registryLayouts)
+    {
+        if (!matchesRequestedLayout(layoutCode, registryLayout))
+        {
+            continue;
+        }
+
+        if (!isInstalled(registryLayout, installedFullCodes, installedPrimaryCodes))
+        {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 } // namespace ghost::core

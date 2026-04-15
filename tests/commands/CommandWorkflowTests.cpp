@@ -142,6 +142,16 @@ std::size_t countCommandsContaining(
     return count;
 }
 
+std::vector<std::string> commandSlice(
+    const std::vector<std::string>& commands,
+    std::size_t begin,
+    std::size_t end)
+{
+    return std::vector<std::string>(
+        commands.begin() + static_cast<std::ptrdiff_t>(begin),
+        commands.begin() + static_cast<std::ptrdiff_t>(end));
+}
+
 bool testBackupPathFormat()
 {
     const ghost::core::BackupService backupService;
@@ -309,12 +319,103 @@ bool testLayoutFixFailurePathsAndScanCases()
         layoutFixService.scan({"EN_us", "ru"}, {"en-US", "ru-RU"});
     const ghost::core::ScanResult ghostScan =
         layoutFixService.scan({"en-US", "de-DE"}, {"en-US"});
+    const bool enUsGhostWithOnlyEnGbInRegistry =
+        layoutFixService.isGhostLayout("en-US", {"en-GB"}, {"ru"});
+    const bool ruRuGhostWithInstalledRu = layoutFixService.isGhostLayout("ru-RU", {"ru-RU"}, {"ru"});
+    const bool deDeGhost = layoutFixService.isGhostLayout("de-DE", {"de-DE"}, {"en-US"});
 
     bool ok = true;
     ok = expect(!fixReport.success, "fix fails when powershell/delete fail") && ok;
     ok = expect(!fixReport.errors.empty(), "fix returns failure details") && ok;
     ok = expect(emptyGhostScan.ghostLayouts.empty(), "scan handles mixed case and underscore normalization") && ok;
     ok = expect(ghostScan.ghostLayouts.size() == 1 && ghostScan.ghostLayouts.front() == "de-DE", "scan detects non-installed layout") && ok;
+    ok = expect(!enUsGhostWithOnlyEnGbInRegistry, "ghost check requires exact normalized layout match between request and registry") && ok;
+    ok = expect(!ruRuGhostWithInstalledRu, "ghost check treats ru and ru-RU as the same installed language") && ok;
+    ok = expect(deDeGhost, "ghost check returns true when layout exists in registry and is not installed") && ok;
+    return ok;
+}
+
+bool testFixRejectsNonGhostLayoutAndAllowsGhostLayout()
+{
+    FakeCommandRunner runner;
+    runner.rules.push_back({"GetCultures", 0, "0419=ru-RU\n0407=de-DE\n"});
+    runner.rules.push_back({"$layout = 'ru-RU'", 0, "ok"});
+    runner.rules.push_back({"$layout = 'de-DE'", 0, "ok"});
+    runner.rules.push_back({"(Get-WinUserLanguageList).LanguageTag", 0, "ru\n"});
+    runner.rules.push_back({"reg query", 0, "    1    REG_SZ    00000419\n    2    REG_SZ    00000407\n"});
+    runner.rules.push_back({"reg export", 0, "ok"});
+    runner.rules.push_back({"reg delete", 0, "ok"});
+    runner.rules.push_back({"Set-WinUserLanguageList", 0, "ok"});
+
+    ghost::core::BackupService backupService(&runner);
+    ghost::platform::RegistryService registryService(&runner);
+    ghost::platform::InstalledLanguageService installedLanguageService(&runner);
+    ghost::core::LayoutFixService layoutFixService(&runner);
+    ghost::report::ReportPrinter printer;
+    FakePrivilegeService admin;
+    ghost::app::ApplicationService app(
+        admin,
+        backupService,
+        registryService,
+        installedLanguageService,
+        layoutFixService,
+        printer);
+
+    ghost::cli::CliOptions nonGhostFix;
+    nonGhostFix.command = ghost::cli::CommandType::Fix;
+    nonGhostFix.layoutCode = "ru-RU";
+    const std::size_t nonGhostFixBefore = runner.commands.size();
+    const int nonGhostFixCode = app.run(nonGhostFix);
+    const std::size_t nonGhostFixAfter = runner.commands.size();
+
+    ghost::cli::CliOptions nonGhostDryRun;
+    nonGhostDryRun.command = ghost::cli::CommandType::Fix;
+    nonGhostDryRun.layoutCode = "ru-RU";
+    nonGhostDryRun.dryRun = true;
+    const std::size_t nonGhostDryRunBefore = runner.commands.size();
+    const int nonGhostDryRunCode = app.run(nonGhostDryRun);
+    const std::size_t nonGhostDryRunAfter = runner.commands.size();
+
+    bool ok = true;
+    ok = expect(nonGhostFixCode == static_cast<int>(ghost::core::ExitCode::FixError), "fix rejects non-ghost ru-RU when ru is installed") && ok;
+    ok = expect(nonGhostFixAfter > nonGhostFixBefore, "non-ghost fix performs validation and ghost checks") && ok;
+    const std::vector<std::string> nonGhostFixCommands =
+        commandSlice(runner.commands, nonGhostFixBefore, nonGhostFixAfter);
+    ok = expect(
+             countCommandsContaining(nonGhostFixCommands, "reg export") == 0,
+             "non-ghost fix does not create backup before ghost check") &&
+        ok;
+    ok = expect(
+             countCommandsContaining(nonGhostFixCommands, "Set-WinUserLanguageList") == 0,
+             "non-ghost fix does not run add/remove cycle") &&
+        ok;
+    ok = expect(
+             countCommandsContaining(nonGhostFixCommands, "reg delete") == 0,
+             "non-ghost fix does not run registry cleanup") &&
+        ok;
+
+    ok = expect(nonGhostDryRunCode == static_cast<int>(ghost::core::ExitCode::FixError), "dry-run rejects non-ghost ru-RU when ru is installed") && ok;
+    ok = expect(nonGhostDryRunAfter > nonGhostDryRunBefore, "non-ghost dry-run performs validation and ghost checks") && ok;
+    const std::vector<std::string> nonGhostDryRunCommands =
+        commandSlice(runner.commands, nonGhostDryRunBefore, nonGhostDryRunAfter);
+    ok = expect(
+             countCommandsContaining(nonGhostDryRunCommands, "reg export") == 0,
+             "non-ghost dry-run does not create backup") &&
+        ok;
+    ok = expect(
+             countCommandsContaining(nonGhostDryRunCommands, "Set-WinUserLanguageList") == 0,
+             "non-ghost dry-run does not run add/remove cycle") &&
+        ok;
+    ok = expect(
+             countCommandsContaining(nonGhostDryRunCommands, "reg delete") == 0,
+             "non-ghost dry-run does not run registry cleanup") &&
+        ok;
+
+    ghost::cli::CliOptions ghostFix;
+    ghostFix.command = ghost::cli::CommandType::Fix;
+    ghostFix.layoutCode = "de-DE";
+    const int ghostFixCode = app.run(ghostFix);
+    ok = expect(ghostFixCode == static_cast<int>(ghost::core::ExitCode::Success), "ghost de-DE fix keeps previous successful behavior") && ok;
     return ok;
 }
 
@@ -448,6 +549,7 @@ int main()
     ok = testRestoreBackupValidationAndFailure() && ok;
     ok = testRegistryFailures() && ok;
     ok = testLayoutFixFailurePathsAndScanCases() && ok;
+    ok = testFixRejectsNonGhostLayoutAndAllowsGhostLayout() && ok;
     ok = testCliAndNoAdmin() && ok;
 
     if (!ok)
