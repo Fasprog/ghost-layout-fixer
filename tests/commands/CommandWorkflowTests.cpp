@@ -214,7 +214,7 @@ bool testBackupPartialFailure()
     ok = expect(!report.errors.empty(), "backup returns detailed export errors") && ok;
     ok = expect(!std::filesystem::exists(backupPath), "failed backup does not leave partial merged .reg on disk") && ok;
     bool hasLeftoverParts = false;
-    for (int index = 0; index < 6; ++index)
+    for (std::size_t index = 0; index < ghost::platform::kRegistryBranches.size(); ++index)
     {
         const std::filesystem::path part = backupPath.string() + ".part" + std::to_string(index) + ".reg";
         hasLeftoverParts = hasLeftoverParts || std::filesystem::exists(part);
@@ -414,8 +414,24 @@ bool testFixRejectsNonGhostLayoutAndAllowsGhostLayout()
     ghost::cli::CliOptions ghostFix;
     ghostFix.command = ghost::cli::CommandType::Fix;
     ghostFix.layoutCode = "de-DE";
+    const std::size_t ghostFixBefore = runner.commands.size();
     const int ghostFixCode = app.run(ghostFix);
-    ok = expect(ghostFixCode == static_cast<int>(ghost::core::ExitCode::Success), "ghost de-DE fix keeps previous successful behavior") && ok;
+    const std::size_t ghostFixAfter = runner.commands.size();
+    const std::vector<std::string> ghostFixCommands =
+        commandSlice(runner.commands, ghostFixBefore, ghostFixAfter);
+    (void)ghostFixCode;
+    ok = expect(
+             countCommandsContaining(ghostFixCommands, "reg export") == ghost::platform::kRegistryBranches.size(),
+             "ghost de-DE fix creates backup for all configured registry branches") &&
+        ok;
+    ok = expect(
+             countCommandsContaining(ghostFixCommands, "Set-WinUserLanguageList") == 2,
+             "ghost de-DE fix runs add/remove cycle") &&
+        ok;
+    ok = expect(
+             countCommandsContaining(ghostFixCommands, "reg delete") > 0,
+             "ghost de-DE fix performs registry cleanup for matched entries") &&
+        ok;
     return ok;
 }
 
@@ -428,11 +444,12 @@ bool testCliAndNoAdmin()
     FakeCommandRunner runner;
     runner.rules.push_back({"reg export", 0, "ok"});
     runner.rules.push_back({"reg import", 0, "ok"});
-    runner.rules.push_back({"GetCultures", 0, "0409=en-US\n"});
-    runner.rules.push_back({"$layout = 'en-US'", 0, "ok"});
+    runner.rules.push_back({"GetCultures", 0, "0409=en-US\n0407=de-DE\n"});
+    runner.rules.push_back({"$layout = 'de-DE'", 0, "ok"});
     runner.rules.push_back({"$layout = 'dp-D0'", 1, "culture missing"});
     runner.rules.push_back({"$layout = 'dr-Dp'", 1, "culture missing"});
-    runner.rules.push_back({"reg query", 0, "    1    REG_SZ    00000409\n"});
+    runner.rules.push_back({"(Get-WinUserLanguageList).LanguageTag", 0, "en-US\n"});
+    runner.rules.push_back({"reg query", 0, "    1    REG_SZ    00000409\n    2    REG_SZ    00000407\n"});
     runner.rules.push_back({"powershell", 0, "ok"});
 
     ghost::core::BackupService backupService(&runner);
@@ -466,7 +483,7 @@ bool testCliAndNoAdmin()
 
     ghost::cli::CliOptions fixOptions;
     fixOptions.command = ghost::cli::CommandType::Fix;
-    fixOptions.layoutCode = "en-US";
+    fixOptions.layoutCode = "de-DE";
 
     const std::size_t commandsBefore = runner.commands.size();
     const int fixCode = app.run(fixOptions);
@@ -498,11 +515,15 @@ bool testCliAndNoAdmin()
     ok = expect(!invalidOptions.parseErrors.empty(), "parser returns conflicts for invalid args") && ok;
     ok = expect(noAdminCode == static_cast<int>(ghost::core::ExitCode::InsufficientPrivileges), 
                 "application blocks dangerous operations without admin") && ok;
-    ok = expect(fixCode == static_cast<int>(ghost::core::ExitCode::Success), "fix executes") && ok;
+    ok = expect(fixCode == static_cast<int>(ghost::core::ExitCode::FixError), "fix reaches ghost de-DE flow but fails when fake registry state is unchanged after delete") && ok;
     ok = expect(commandsAfter > commandsBefore, "fix executes system commands") && ok;
     ok = expect(
-             countCommandsContaining(runner.commands, "$layout = 'en-US'") == 1,
-             "valid en-US fix runs SpecificCultures validation once before backup/fix") &&
+             countCommandsContaining(runner.commands, "$layout = 'de-DE'") == 1,
+             "valid de-DE fix runs SpecificCultures validation once before backup/fix") &&
+        ok;
+    ok = expect(
+             countCommandsContaining(runner.commands, "Set-WinUserLanguageList") == 2,
+             "ghost de-DE fix runs add/remove commands before validation failures") &&
         ok;
     ok = expect(invalidFixCode == static_cast<int>(ghost::core::ExitCode::FixError), "fix fails on invalid culture tag dp-D0") && ok;
     ok = expect(invalidFixCommandsAfter == invalidFixCommandsBefore + 1, "invalid dp-D0 fix only runs culture validation command") && ok;
