@@ -106,7 +106,13 @@ std::string extractLanguageIdHex(const std::string& hkl)
         return {};
     }
 
-    return hkl.substr(hkl.size() - 4);
+    std::string lcidHex = hkl.substr(hkl.size() - 4);
+    for (char& symbol : lcidHex)
+    {
+        symbol = static_cast<char>(std::toupper(static_cast<unsigned char>(symbol)));
+    }
+
+    return lcidHex;
 }
 
 std::string hklToLayoutCode(

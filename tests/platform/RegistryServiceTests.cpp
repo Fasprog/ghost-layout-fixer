@@ -49,3 +49,33 @@ bool testRegistryMissingBranchIsSkipped()
     ok = expect(layoutsResult.values.empty(), "missing whitelist branches produce empty registry layout list") && ok;
     return ok;
 }
+
+bool testRegistryLcidLookupIsCaseInsensitive()
+{
+    FakeCommandRunner upperCaseRunner;
+    upperCaseRunner.rules.push_back({"GetCultures", 0, "040C=fr-FR\n"});
+    upperCaseRunner.rules.push_back({"reg query", 0, "    1    REG_SZ    0000040C\n"});
+    const ghost::platform::RegistryService upperCaseService(&upperCaseRunner);
+
+    const ghost::platform::RegistryLayoutsResult upperCaseResult = upperCaseService.listLayoutCodesFromRegistry();
+
+    FakeCommandRunner lowerCaseRunner;
+    lowerCaseRunner.rules.push_back({"GetCultures", 0, "040C=fr-FR\n"});
+    lowerCaseRunner.rules.push_back({"reg query", 0, "    1    REG_SZ    0000040c\n"});
+    const ghost::platform::RegistryService lowerCaseService(&lowerCaseRunner);
+
+    const ghost::platform::RegistryLayoutsResult lowerCaseResult = lowerCaseService.listLayoutCodesFromRegistry();
+
+    bool ok = true;
+    ok = expect(upperCaseResult.success, "uppercase HKL LCID is parsed successfully") && ok;
+    ok = expect(lowerCaseResult.success, "lowercase HKL LCID is parsed successfully") && ok;
+    ok = expect(upperCaseResult.values.size() == 1, "uppercase HKL yields one registry entry") && ok;
+    ok = expect(lowerCaseResult.values.size() == 1, "lowercase HKL yields one registry entry") && ok;
+    ok = expect(upperCaseResult.values[0].layoutCode == "fr-FR", "0000040C resolves to fr-FR") && ok;
+    ok = expect(lowerCaseResult.values[0].layoutCode == "fr-FR", "0000040c resolves to fr-FR") && ok;
+    ok = expect(
+             upperCaseResult.values[0].layoutCode == lowerCaseResult.values[0].layoutCode,
+             "uppercase and lowercase HKL LCID variants resolve identically") &&
+        ok;
+    return ok;
+}

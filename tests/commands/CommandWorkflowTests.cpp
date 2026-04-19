@@ -538,6 +538,7 @@ int main()
     ok = testLayoutFixFailurePathsAndScanCases() && ok;
     ok = testRegistryFailures() && ok;
     ok = testRegistryMissingBranchIsSkipped() && ok;
+    ok = testRegistryLcidLookupIsCaseInsensitive() && ok;
     ok = testInstalledLanguageParsing() && ok;
     ok = testInstalledLanguageEmptyOnFailure() && ok;
     ok = testFixRejectsNonGhostLayoutWithNeutralInstalledTagAndAllowsGhostLayout() && ok;
