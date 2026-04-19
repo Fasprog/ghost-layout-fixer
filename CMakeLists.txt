@@ -46,6 +46,10 @@ if(BUILD_TESTS)
         src/platform/src/InstalledLanguageService.cpp
         src/report/src/ReportPrinter.cpp
         tests/commands/CommandWorkflowTests.cpp
+        tests/core/BackupServiceTests.cpp
+        tests/core/LayoutFixServiceTests.cpp
+        tests/platform/RegistryServiceTests.cpp
+        tests/platform/InstalledLanguageServiceTests.cpp
     )
     target_include_directories(ghost-layout-fixer-tests PRIVATE
         ${CMAKE_SOURCE_DIR}
