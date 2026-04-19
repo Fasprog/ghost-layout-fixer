@@ -16,6 +16,20 @@ struct RegistryMatch
     std::string valueData;
 };
 
+struct RegistryLayoutsResult
+{
+    bool success{false};
+    std::vector<std::string> values;
+    std::string error;
+};
+
+struct RegistryMatchesResult
+{
+    bool success{false};
+    std::vector<RegistryMatch> values;
+    std::string error;
+};
+
 /// @brief Сервис доступа к whitelist-веткам реестра.
 class RegistryService
 {
@@ -25,11 +39,11 @@ public:
     /// @brief Ищет совпадения по коду раскладки.
     /// @param[in] layoutCode Код раскладки (например, en-GB).
     /// @return Список совпадений в реестре.
-    std::vector<RegistryMatch> findLayoutMatches(const std::string& layoutCode) const;
+    RegistryMatchesResult findLayoutMatches(const std::string& layoutCode) const;
 
     /// @brief Получает все коды раскладок, найденные в реестре.
     /// @return Список кодов раскладок из whitelist-веток.
-    std::vector<std::string> listLayoutCodesFromRegistry() const;
+    RegistryLayoutsResult listLayoutCodesFromRegistry() const;
 
     /// @brief Удаляет найденные совпадения по значениям в реестре.
     /// @param[in] matches Совпадения, которые требуется удалить.
