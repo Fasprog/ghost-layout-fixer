@@ -22,7 +22,7 @@ using ghost::tests::commandSlice;
 using ghost::tests::countCommandsContaining;
 using ghost::tests::expect;
 
-bool testFixRejectsNonGhostLayoutAndAllowsGhostLayout()
+bool testFixRejectsNonGhostLayoutWithNeutralInstalledTagAndAllowsGhostLayout()
 {
     FakeCommandRunner runner;
     runner.rules.push_back({"$layout = 'ru-RU'", 0, "ok"});
@@ -64,7 +64,7 @@ bool testFixRejectsNonGhostLayoutAndAllowsGhostLayout()
     const std::size_t nonGhostDryRunAfter = runner.commands.size();
 
     bool ok = true;
-    ok = expect(nonGhostFixCode == static_cast<int>(ghost::core::ExitCode::FixError), "fix rejects non-ghost ru-RU when ru is installed") && ok;
+    ok = expect(nonGhostFixCode == static_cast<int>(ghost::core::ExitCode::FixError), "fix rejects non-ghost ru-RU when neutral ru is installed") && ok;
     ok = expect(nonGhostFixAfter > nonGhostFixBefore, "non-ghost fix performs validation and ghost checks") && ok;
     const std::vector<std::string> nonGhostFixCommands =
         commandSlice(runner.commands, nonGhostFixBefore, nonGhostFixAfter);
@@ -81,7 +81,7 @@ bool testFixRejectsNonGhostLayoutAndAllowsGhostLayout()
              "non-ghost fix does not run registry cleanup") &&
         ok;
 
-    ok = expect(nonGhostDryRunCode == static_cast<int>(ghost::core::ExitCode::FixError), "dry-run rejects non-ghost ru-RU when ru is installed") && ok;
+    ok = expect(nonGhostDryRunCode == static_cast<int>(ghost::core::ExitCode::FixError), "dry-run rejects non-ghost ru-RU when neutral ru is installed") && ok;
     ok = expect(nonGhostDryRunAfter > nonGhostDryRunBefore, "non-ghost dry-run performs validation and ghost checks") && ok;
     const std::vector<std::string> nonGhostDryRunCommands =
         commandSlice(runner.commands, nonGhostDryRunBefore, nonGhostDryRunAfter);
@@ -540,7 +540,7 @@ int main()
     ok = testRegistryMissingBranchIsSkipped() && ok;
     ok = testInstalledLanguageParsing() && ok;
     ok = testInstalledLanguageEmptyOnFailure() && ok;
-    ok = testFixRejectsNonGhostLayoutAndAllowsGhostLayout() && ok;
+    ok = testFixRejectsNonGhostLayoutWithNeutralInstalledTagAndAllowsGhostLayout() && ok;
     ok = testCliAndNoAdmin() && ok;
     ok = testApplicationReadFailureHandling() && ok;
 

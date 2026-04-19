@@ -17,7 +17,8 @@ public:
     explicit LayoutFixService(const ghost::platform::ICommandRunner* runner = nullptr);
 
     /// @brief Выявляет призрачные раскладки из разницы реестра и установленных языков.
-    /// При сравнении учитывает нормализацию тегов (`ru` ~= `ru-RU`).
+    /// При сравнении учитывает точное совпадение нормализованного language tag
+    /// и special-case для neutral installed tag (`ru` совпадает с `ru-RU`).
     /// @param[in] registryLayouts Коды раскладок, найденные в реестре.
     /// @param[in] installedLayouts Коды реально установленных раскладок.
     /// @return Результат сканирования с перечнем ghost-раскладок.
@@ -47,7 +48,7 @@ public:
 
     /// @brief Проверяет, что раскладка действительно ghost:
     /// есть в реестре и отсутствует среди реально установленных языков
-    /// (с учетом normal/primary matching как в scan()).
+    /// (с учетом правил matching из scan()).
     bool isGhostLayout(
         const std::string& layoutCode,
         const std::vector<std::string>& registryLayouts,
