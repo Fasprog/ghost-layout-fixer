@@ -26,10 +26,17 @@ bool testInstalledLanguageParsing()
 bool testInstalledLanguageEmptyOnFailure()
 {
     FakeCommandRunner runner;
-    runner.rules.push_back({"(Get-WinUserLanguageList).LanguageTag", 1, "failed"});
+    runner.rules.push_back({"(Get-WinUserLanguageList).LanguageTag", 1, "failed to query languages"});
+
+    const ghost::platform::CommandResult runResult = runner.run(
+        "powershell -NoProfile -Command \"(Get-WinUserLanguageList).LanguageTag\"");
 
     const ghost::platform::InstalledLanguageService service(&runner);
     const std::vector<std::string> layouts = service.listInstalledLayoutCodes();
 
-    return expect(layouts.empty(), "installed language parser returns empty list on command failure output");
+    bool ok = true;
+    ok = expect(runResult.exitCode != 0, "installed language command fails with non-zero exit code in fake runner") && ok;
+    ok = expect(!runResult.outputText.empty(), "installed language command failure keeps error text in output") && ok;
+    ok = expect(layouts.empty(), "installed language parser returns empty list on command failure output") && ok;
+    return ok;
 }
