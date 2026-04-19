@@ -15,7 +15,7 @@ bool testRegistryFailures()
     queryFailRunner.rules.push_back({"reg query", 1, "query failed"});
     const ghost::platform::RegistryService registryQueryFail(&queryFailRunner);
 
-    const std::vector<std::string> layouts = registryQueryFail.listLayoutCodesFromRegistry();
+    const ghost::platform::RegistryLayoutsResult layoutsResult = registryQueryFail.listLayoutCodesFromRegistry();
 
     FakeCommandRunner deleteFailRunner;
     deleteFailRunner.rules.push_back({"reg delete", 1, "delete failed"});
@@ -28,7 +28,9 @@ bool testRegistryFailures()
     const std::vector<std::string> errors = registryDeleteFail.deleteMatches(matches);
 
     bool ok = true;
-    ok = expect(layouts.empty(), "registry list is empty when reg query fails") && ok;
+    ok = expect(!layoutsResult.success, "registry list reports failure when reg query fails") && ok;
+    ok = expect(layoutsResult.values.empty(), "registry list contains no values when query fails") && ok;
+    ok = expect(!layoutsResult.error.empty(), "registry list includes error details on query failure") && ok;
     ok = expect(!errors.empty(), "registry delete returns error details on failure") && ok;
     return ok;
 }

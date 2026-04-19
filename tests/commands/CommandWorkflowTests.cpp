@@ -260,6 +260,261 @@ bool testCliAndNoAdmin()
     return ok;
 }
 
+bool testApplicationReadFailureHandling()
+{
+    bool ok = true;
+
+    {
+        FakeCommandRunner runner;
+        runner.rules.push_back({"GetCultures", 0, "0407=de-DE\n"});
+        runner.rules.push_back({"reg query", 0, "    1    REG_SZ    00000407\n"});
+        runner.rules.push_back({"(Get-WinUserLanguageList).LanguageTag", 1, "language query failed"});
+
+        ghost::core::BackupService backupService(&runner);
+        ghost::platform::RegistryService registryService(&runner);
+        ghost::platform::InstalledLanguageService installedLanguageService(&runner);
+        ghost::core::LayoutFixService layoutFixService(&runner);
+        ghost::report::ReportPrinter printer;
+        FakePrivilegeService admin;
+        ghost::app::ApplicationService app(
+            admin,
+            backupService,
+            registryService,
+            installedLanguageService,
+            layoutFixService,
+            printer);
+
+        ghost::cli::CliOptions scanOptions;
+        scanOptions.command = ghost::cli::CommandType::Scan;
+        const int code = app.run(scanOptions);
+        ok = expect(code == static_cast<int>(ghost::core::ExitCode::GeneralError),
+                    "scan fails when installed language query fails") &&
+            ok;
+    }
+
+    {
+        FakeCommandRunner runner;
+        runner.rules.push_back({"GetCultures", 1, "lcid map failed"});
+        runner.rules.push_back({"(Get-WinUserLanguageList).LanguageTag", 0, "de-DE\n"});
+
+        ghost::core::BackupService backupService(&runner);
+        ghost::platform::RegistryService registryService(&runner);
+        ghost::platform::InstalledLanguageService installedLanguageService(&runner);
+        ghost::core::LayoutFixService layoutFixService(&runner);
+        ghost::report::ReportPrinter printer;
+        FakePrivilegeService admin;
+        ghost::app::ApplicationService app(
+            admin,
+            backupService,
+            registryService,
+            installedLanguageService,
+            layoutFixService,
+            printer);
+
+        ghost::cli::CliOptions scanOptions;
+        scanOptions.command = ghost::cli::CommandType::Scan;
+        const int code = app.run(scanOptions);
+        ok = expect(code == static_cast<int>(ghost::core::ExitCode::GeneralError),
+                    "scan fails when registry LCID mapping fails") &&
+            ok;
+    }
+
+    {
+        FakeCommandRunner runner;
+        runner.rules.push_back({"$layout = 'de-DE'", 0, "ok"});
+        runner.rules.push_back({"GetCultures", 0, "0407=de-DE\n"});
+        runner.rules.push_back({"reg query", 0, "    1    REG_SZ    00000407\n"});
+        runner.rules.push_back({"(Get-WinUserLanguageList).LanguageTag", 1, "language query failed"});
+        runner.rules.push_back({"reg export", 0, "ok"});
+        runner.rules.push_back({"Set-WinUserLanguageList", 0, "ok"});
+
+        ghost::core::BackupService backupService(&runner);
+        ghost::platform::RegistryService registryService(&runner);
+        ghost::platform::InstalledLanguageService installedLanguageService(&runner);
+        ghost::core::LayoutFixService layoutFixService(&runner);
+        ghost::report::ReportPrinter printer;
+        FakePrivilegeService admin;
+        ghost::app::ApplicationService app(
+            admin,
+            backupService,
+            registryService,
+            installedLanguageService,
+            layoutFixService,
+            printer);
+
+        ghost::cli::CliOptions dryRunOptions;
+        dryRunOptions.command = ghost::cli::CommandType::Fix;
+        dryRunOptions.layoutCode = "de-DE";
+        dryRunOptions.dryRun = true;
+        const std::size_t commandsBefore = runner.commands.size();
+        const int code = app.run(dryRunOptions);
+        const std::size_t commandsAfter = runner.commands.size();
+        const std::vector<std::string> commands = commandSlice(runner.commands, commandsBefore, commandsAfter);
+        ok = expect(code == static_cast<int>(ghost::core::ExitCode::FixError),
+                    "fix --dry-run aborts when installed language query fails") &&
+            ok;
+        ok = expect(
+                 countCommandsContaining(commands, "reg export") == 0,
+                 "fix --dry-run does not create backup when installed language read fails") &&
+            ok;
+    }
+
+    {
+        FakeCommandRunner runner;
+        runner.rules.push_back({"$layout = 'de-DE'", 0, "ok"});
+        runner.rules.push_back({"GetCultures", 0, "0407=de-DE\n"});
+        runner.rules.push_back({"reg query", 0, "    1    REG_SZ    00000407\n"});
+        runner.rules.push_back({"(Get-WinUserLanguageList).LanguageTag", 1, "language query failed"});
+        runner.rules.push_back({"reg export", 0, "ok"});
+
+        ghost::core::BackupService backupService(&runner);
+        ghost::platform::RegistryService registryService(&runner);
+        ghost::platform::InstalledLanguageService installedLanguageService(&runner);
+        ghost::core::LayoutFixService layoutFixService(&runner);
+        ghost::report::ReportPrinter printer;
+        FakePrivilegeService admin;
+        ghost::app::ApplicationService app(
+            admin,
+            backupService,
+            registryService,
+            installedLanguageService,
+            layoutFixService,
+            printer);
+
+        ghost::cli::CliOptions fixOptions;
+        fixOptions.command = ghost::cli::CommandType::Fix;
+        fixOptions.layoutCode = "de-DE";
+        const std::size_t commandsBefore = runner.commands.size();
+        const int code = app.run(fixOptions);
+        const std::size_t commandsAfter = runner.commands.size();
+        const std::vector<std::string> commands = commandSlice(runner.commands, commandsBefore, commandsAfter);
+        ok = expect(code == static_cast<int>(ghost::core::ExitCode::FixError),
+                    "fix aborts before backup when installed language query fails") &&
+            ok;
+        ok = expect(
+                 countCommandsContaining(commands, "reg export") == 0,
+                 "fix does not create backup when installed language read fails") &&
+            ok;
+    }
+
+    {
+        FakeCommandRunner runner;
+        runner.rules.push_back({"$layout = 'de-DE'", 0, "ok"});
+        runner.rules.push_back({"GetCultures", 1, "lcid map failed"});
+        runner.rules.push_back({"(Get-WinUserLanguageList).LanguageTag", 0, "de-DE\n"});
+        runner.rules.push_back({"reg export", 0, "ok"});
+
+        ghost::core::BackupService backupService(&runner);
+        ghost::platform::RegistryService registryService(&runner);
+        ghost::platform::InstalledLanguageService installedLanguageService(&runner);
+        ghost::core::LayoutFixService layoutFixService(&runner);
+        ghost::report::ReportPrinter printer;
+        FakePrivilegeService admin;
+        ghost::app::ApplicationService app(
+            admin,
+            backupService,
+            registryService,
+            installedLanguageService,
+            layoutFixService,
+            printer);
+
+        ghost::cli::CliOptions fixOptions;
+        fixOptions.command = ghost::cli::CommandType::Fix;
+        fixOptions.layoutCode = "de-DE";
+        const std::size_t commandsBefore = runner.commands.size();
+        const int code = app.run(fixOptions);
+        const std::size_t commandsAfter = runner.commands.size();
+        const std::vector<std::string> commands = commandSlice(runner.commands, commandsBefore, commandsAfter);
+        ok = expect(code == static_cast<int>(ghost::core::ExitCode::FixError),
+                    "fix aborts before backup when registry read fails") &&
+            ok;
+        ok = expect(
+                 countCommandsContaining(commands, "reg export") == 0,
+                 "fix does not create backup when registry read fails") &&
+            ok;
+    }
+
+    {
+        struct FinalVerificationFailRunner final : ghost::platform::ICommandRunner
+        {
+            mutable std::vector<std::string> commands;
+            mutable int mappingReadCount{0};
+
+            ghost::platform::CommandResult run(const std::string& command) const override
+            {
+                commands.push_back(command);
+
+                if (command.find("$layout = 'de-DE'") != std::string::npos)
+                {
+                    return {0, "ok"};
+                }
+
+                if (command.find("(Get-WinUserLanguageList).LanguageTag") != std::string::npos)
+                {
+                    return {0, "en-US\n"};
+                }
+
+                if (command.find("'{0:X4}={1}' -f $_.LCID, $_.Name") != std::string::npos)
+                {
+                    ++mappingReadCount;
+                    if (mappingReadCount >= 3)
+                    {
+                        return {1, "final verification mapping failed"};
+                    }
+                    return {0, "0409=en-US\n0407=de-DE\n"};
+                }
+
+                if (command.find("reg query") != std::string::npos)
+                {
+                    return {0, "    1    REG_SZ    00000407\n"};
+                }
+
+                if (command.find("reg export") != std::string::npos)
+                {
+                    return {0, "ok"};
+                }
+
+                if (command.find("reg delete") != std::string::npos)
+                {
+                    return {0, "ok"};
+                }
+
+                if (command.find("Set-WinUserLanguageList") != std::string::npos)
+                {
+                    return {0, "ok"};
+                }
+
+                return {};
+            }
+        };
+
+        FinalVerificationFailRunner runner;
+        ghost::core::BackupService backupService(&runner);
+        ghost::platform::RegistryService registryService(&runner);
+        ghost::platform::InstalledLanguageService installedLanguageService(&runner);
+        ghost::core::LayoutFixService layoutFixService(&runner);
+        ghost::report::ReportPrinter printer;
+        FakePrivilegeService admin;
+        ghost::app::ApplicationService app(
+            admin,
+            backupService,
+            registryService,
+            installedLanguageService,
+            layoutFixService,
+            printer);
+
+        ghost::cli::CliOptions fixOptions;
+        fixOptions.command = ghost::cli::CommandType::Fix;
+        fixOptions.layoutCode = "de-DE";
+        const int code = app.run(fixOptions);
+        ok = expect(code == static_cast<int>(ghost::core::ExitCode::FixError),
+                    "fix does not report success when final registry verification fails") &&
+            ok;
+    }
+
+    return ok;
+}
+
 int main()
 {
     bool ok = true;
@@ -274,6 +529,7 @@ int main()
     ok = testInstalledLanguageEmptyOnFailure() && ok;
     ok = testFixRejectsNonGhostLayoutAndAllowsGhostLayout() && ok;
     ok = testCliAndNoAdmin() && ok;
+    ok = testApplicationReadFailureHandling() && ok;
 
     if (!ok)
     {
