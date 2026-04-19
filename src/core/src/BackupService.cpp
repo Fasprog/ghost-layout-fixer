@@ -258,6 +258,7 @@ BackupReport BackupService::createBackup(const std::string& backupPath) const
 
     if (!report.errors.empty())
     {
+        mergedBackup.close();
         std::error_code ignore;
         std::filesystem::remove(backupPath, ignore);
     }

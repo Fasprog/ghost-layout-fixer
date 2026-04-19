@@ -488,6 +488,7 @@ bool testCliAndNoAdmin()
     const std::size_t commandsBefore = runner.commands.size();
     const int fixCode = app.run(fixOptions);
     const std::size_t commandsAfter = runner.commands.size();
+    const std::vector<std::string> fixCommands = commandSlice(runner.commands, commandsBefore, commandsAfter);
 
     ghost::cli::CliOptions invalidFixOptions;
     invalidFixOptions.command = ghost::cli::CommandType::Fix;
@@ -495,6 +496,8 @@ bool testCliAndNoAdmin()
     const std::size_t invalidFixCommandsBefore = runner.commands.size();
     const int invalidFixCode = app.run(invalidFixOptions);
     const std::size_t invalidFixCommandsAfter = runner.commands.size();
+    const std::vector<std::string> invalidFixCommands =
+        commandSlice(runner.commands, invalidFixCommandsBefore, invalidFixCommandsAfter);
 
     ghost::cli::CliOptions invalidFixOptionsSecond;
     invalidFixOptionsSecond.command = ghost::cli::CommandType::Fix;
@@ -502,6 +505,8 @@ bool testCliAndNoAdmin()
     const std::size_t invalidFixCommandsSecondBefore = runner.commands.size();
     const int invalidFixCodeSecond = app.run(invalidFixOptionsSecond);
     const std::size_t invalidFixCommandsSecondAfter = runner.commands.size();
+    const std::vector<std::string> invalidFixCommandsSecond =
+        commandSlice(runner.commands, invalidFixCommandsSecondBefore, invalidFixCommandsSecondAfter);
 
     ghost::cli::CliOptions invalidDryRunOptions;
     invalidDryRunOptions.command = ghost::cli::CommandType::Fix;
@@ -510,6 +515,8 @@ bool testCliAndNoAdmin()
     const std::size_t invalidDryRunCommandsBefore = runner.commands.size();
     const int invalidDryRunCode = app.run(invalidDryRunOptions);
     const std::size_t invalidDryRunCommandsAfter = runner.commands.size();
+    const std::vector<std::string> invalidDryRunCommands =
+        commandSlice(runner.commands, invalidDryRunCommandsBefore, invalidDryRunCommandsAfter);
 
     bool ok = true;
     ok = expect(!invalidOptions.parseErrors.empty(), "parser returns conflicts for invalid args") && ok;
@@ -518,41 +525,49 @@ bool testCliAndNoAdmin()
     ok = expect(fixCode == static_cast<int>(ghost::core::ExitCode::FixError), "fix reaches ghost de-DE flow but fails when fake registry state is unchanged after delete") && ok;
     ok = expect(commandsAfter > commandsBefore, "fix executes system commands") && ok;
     ok = expect(
-             countCommandsContaining(runner.commands, "$layout = 'de-DE'") == 1,
+             countCommandsContaining(fixCommands, "$layout = 'de-DE'") == 1,
              "valid de-DE fix runs SpecificCultures validation once before backup/fix") &&
         ok;
     ok = expect(
-             countCommandsContaining(runner.commands, "Set-WinUserLanguageList") == 2,
+             countCommandsContaining(fixCommands, "Set-WinUserLanguageList") == 2,
              "ghost de-DE fix runs add/remove commands before validation failures") &&
+        ok;
+    ok = expect(
+             countCommandsContaining(fixCommands, "reg export") == ghost::platform::kRegistryBranches.size(),
+             "ghost de-DE fix exports all configured branches in backup") &&
         ok;
     ok = expect(invalidFixCode == static_cast<int>(ghost::core::ExitCode::FixError), "fix fails on invalid culture tag dp-D0") && ok;
     ok = expect(invalidFixCommandsAfter == invalidFixCommandsBefore + 1, "invalid dp-D0 fix only runs culture validation command") && ok;
     ok = expect(
-             countCommandsContaining(runner.commands, "$layout = 'dp-D0'") == 1,
+             countCommandsContaining(invalidFixCommands, "$layout = 'dp-D0'") == 1,
              "invalid dp-D0 triggers SpecificCultures validation") &&
         ok;
     ok = expect(
-             countCommandsContaining(runner.commands, "Set-WinUserLanguageList") == 2,
+             countCommandsContaining(invalidFixCommands, "Set-WinUserLanguageList") == 0,
              "invalid dp-D0 does not run add/remove fix commands") &&
         ok;
     ok = expect(
-             countCommandsContaining(runner.commands, "reg export") == ghost::platform::kRegistryBranches.size(),
+             countCommandsContaining(invalidFixCommands, "reg export") == 0,
              "invalid dp-D0 does not create additional backup exports") &&
         ok;
     ok = expect(invalidFixCodeSecond == static_cast<int>(ghost::core::ExitCode::FixError), "fix fails on invalid culture tag dr-Dp") && ok;
     ok = expect(invalidFixCommandsSecondAfter == invalidFixCommandsSecondBefore + 1, "invalid dr-Dp fix only runs culture validation command") && ok;
     ok = expect(
-             countCommandsContaining(runner.commands, "$layout = 'dr-Dp'") == 1,
+             countCommandsContaining(invalidFixCommandsSecond, "$layout = 'dr-Dp'") == 1,
              "invalid dr-Dp triggers SpecificCultures validation") &&
         ok;
     ok = expect(
-             countCommandsContaining(runner.commands, "reg export") == ghost::platform::kRegistryBranches.size(),
+             countCommandsContaining(invalidFixCommandsSecond, "Set-WinUserLanguageList") == 0,
+             "invalid dr-Dp does not run add/remove fix commands") &&
+        ok;
+    ok = expect(
+             countCommandsContaining(invalidFixCommandsSecond, "reg export") == 0,
              "invalid dr-Dp does not create additional backup exports") &&
         ok;
     ok = expect(invalidDryRunCode == static_cast<int>(ghost::core::ExitCode::FixError), "dry-run fails fast on invalid layout code") && ok;
     ok = expect(invalidDryRunCommandsAfter == invalidDryRunCommandsBefore, "invalid dry-run does not build plan through registry commands") && ok;
     ok = expect(
-             countCommandsContaining(runner.commands, "GetCultures([System.Globalization.CultureTypes]::SpecificCultures)") == 3,
+             countCommandsContaining(invalidDryRunCommands, "GetCultures([System.Globalization.CultureTypes]::SpecificCultures)") == 0,
              "invalid! is rejected by regex and does not trigger SpecificCultures validation") &&
         ok;
     return ok;
