@@ -296,7 +296,11 @@ bool testRegistryFailures()
     FakeCommandRunner deleteFailRunner;
     deleteFailRunner.rules.push_back({"reg delete", 1, "delete failed"});
     const ghost::platform::RegistryService registryDeleteFail(&deleteFailRunner);
-    const std::vector<ghost::platform::RegistryMatch> matches = {{"HKCU", "HKEY_CURRENT_USER\\Keyboard Layout\\Preload", "1", "00000409"}};
+    ghost::platform::RegistryMatch match;
+    match.branchPath = "HKEY_CURRENT_USER\\Keyboard Layout\\Preload";
+    match.valueName = "1";
+    match.valueData = "00000409";
+    const std::vector<ghost::platform::RegistryMatch> matches = {match};
     const std::vector<std::string> errors = registryDeleteFail.deleteMatches(matches);
 
     bool ok = true;
@@ -338,9 +342,9 @@ bool testLayoutFixFailurePathsAndScanCases()
 bool testFixRejectsNonGhostLayoutAndAllowsGhostLayout()
 {
     FakeCommandRunner runner;
-    runner.rules.push_back({"GetCultures", 0, "0419=ru-RU\n0407=de-DE\n"});
     runner.rules.push_back({"$layout = 'ru-RU'", 0, "ok"});
     runner.rules.push_back({"$layout = 'de-DE'", 0, "ok"});
+    runner.rules.push_back({"GetCultures", 0, "0419=ru-RU\n0407=de-DE\n"});
     runner.rules.push_back({"(Get-WinUserLanguageList).LanguageTag", 0, "ru\n"});
     runner.rules.push_back({"reg query", 0, "    1    REG_SZ    00000419\n    2    REG_SZ    00000407\n"});
     runner.rules.push_back({"reg export", 0, "ok"});
@@ -444,10 +448,10 @@ bool testCliAndNoAdmin()
     FakeCommandRunner runner;
     runner.rules.push_back({"reg export", 0, "ok"});
     runner.rules.push_back({"reg import", 0, "ok"});
-    runner.rules.push_back({"GetCultures", 0, "0409=en-US\n0407=de-DE\n"});
     runner.rules.push_back({"$layout = 'de-DE'", 0, "ok"});
     runner.rules.push_back({"$layout = 'dp-D0'", 1, "culture missing"});
     runner.rules.push_back({"$layout = 'dr-Dp'", 1, "culture missing"});
+    runner.rules.push_back({"GetCultures", 0, "0409=en-US\n0407=de-DE\n"});
     runner.rules.push_back({"(Get-WinUserLanguageList).LanguageTag", 0, "en-US\n"});
     runner.rules.push_back({"reg query", 0, "    1    REG_SZ    00000409\n    2    REG_SZ    00000407\n"});
     runner.rules.push_back({"powershell", 0, "ok"});
