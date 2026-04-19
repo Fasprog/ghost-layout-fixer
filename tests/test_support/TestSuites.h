@@ -14,5 +14,5 @@ bool testRegistryMissingBranchIsSkipped();
 bool testInstalledLanguageParsing();
 bool testInstalledLanguageEmptyOnFailure();
 
-bool testFixRejectsNonGhostLayoutAndAllowsGhostLayout();
+bool testFixAllowsGhostLayoutWithExactTagMatching();
 bool testCliAndNoAdmin();

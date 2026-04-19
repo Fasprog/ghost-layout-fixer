@@ -30,31 +30,12 @@ std::string normalizeCode(const std::string& code)
     return normalized;
 }
 
-std::string primaryLanguageTag(const std::string& code)
-{
-    const std::string normalized = normalizeCode(code);
-    const std::size_t separatorPos = normalized.find('-');
-    if (separatorPos == std::string::npos)
-    {
-        return normalized;
-    }
-
-    return normalized.substr(0, separatorPos);
-}
-
 bool isInstalled(
     const std::string& registryLayout,
-    const std::unordered_set<std::string>& installedFullCodes,
-    const std::unordered_set<std::string>& installedPrimaryCodes)
+    const std::unordered_set<std::string>& installedFullCodes)
 {
     const std::string normalizedRegistry = normalizeCode(registryLayout);
-    if (installedFullCodes.find(normalizedRegistry) != installedFullCodes.end())
-    {
-        return true;
-    }
-
-    const std::string registryPrimary = primaryLanguageTag(registryLayout);
-    return installedPrimaryCodes.find(registryPrimary) != installedPrimaryCodes.end();
+    return installedFullCodes.find(normalizedRegistry) != installedFullCodes.end();
 }
 
 bool matchesRequestedLayout(
@@ -88,16 +69,14 @@ ScanResult LayoutFixService::scan(
     result.installedLayouts = installedLayouts;
 
     std::unordered_set<std::string> installedFullCodes;
-    std::unordered_set<std::string> installedPrimaryCodes;
     for (const std::string& installedLayout : installedLayouts)
     {
         installedFullCodes.insert(normalizeCode(installedLayout));
-        installedPrimaryCodes.insert(primaryLanguageTag(installedLayout));
     }
 
     for (const std::string& layoutCode : registryLayouts)
     {
-        if (!isInstalled(layoutCode, installedFullCodes, installedPrimaryCodes))
+        if (!isInstalled(layoutCode, installedFullCodes))
         {
             result.ghostLayouts.push_back(layoutCode);
         }
@@ -206,11 +185,9 @@ bool LayoutFixService::isGhostLayout(
     const std::vector<std::string>& installedLayouts) const
 {
     std::unordered_set<std::string> installedFullCodes;
-    std::unordered_set<std::string> installedPrimaryCodes;
     for (const std::string& installedLayout : installedLayouts)
     {
         installedFullCodes.insert(normalizeCode(installedLayout));
-        installedPrimaryCodes.insert(primaryLanguageTag(installedLayout));
     }
 
     for (const std::string& registryLayout : registryLayouts)
@@ -220,7 +197,7 @@ bool LayoutFixService::isGhostLayout(
             continue;
         }
 
-        if (!isInstalled(registryLayout, installedFullCodes, installedPrimaryCodes))
+        if (!isInstalled(registryLayout, installedFullCodes))
         {
             return true;
         }

@@ -22,7 +22,7 @@ using ghost::tests::commandSlice;
 using ghost::tests::countCommandsContaining;
 using ghost::tests::expect;
 
-bool testFixRejectsNonGhostLayoutAndAllowsGhostLayout()
+bool testFixAllowsGhostLayoutWithExactTagMatching()
 {
     FakeCommandRunner runner;
     runner.rules.push_back({"$layout = 'ru-RU'", 0, "ok"});
@@ -48,54 +48,54 @@ bool testFixRejectsNonGhostLayoutAndAllowsGhostLayout()
         layoutFixService,
         printer);
 
-    ghost::cli::CliOptions nonGhostFix;
-    nonGhostFix.command = ghost::cli::CommandType::Fix;
-    nonGhostFix.layoutCode = "ru-RU";
-    const std::size_t nonGhostFixBefore = runner.commands.size();
-    const int nonGhostFixCode = app.run(nonGhostFix);
-    const std::size_t nonGhostFixAfter = runner.commands.size();
+    ghost::cli::CliOptions ruRuGhostFix;
+    ruRuGhostFix.command = ghost::cli::CommandType::Fix;
+    ruRuGhostFix.layoutCode = "ru-RU";
+    const std::size_t ruRuGhostFixBefore = runner.commands.size();
+    const int ruRuGhostFixCode = app.run(ruRuGhostFix);
+    const std::size_t ruRuGhostFixAfter = runner.commands.size();
 
-    ghost::cli::CliOptions nonGhostDryRun;
-    nonGhostDryRun.command = ghost::cli::CommandType::Fix;
-    nonGhostDryRun.layoutCode = "ru-RU";
-    nonGhostDryRun.dryRun = true;
-    const std::size_t nonGhostDryRunBefore = runner.commands.size();
-    const int nonGhostDryRunCode = app.run(nonGhostDryRun);
-    const std::size_t nonGhostDryRunAfter = runner.commands.size();
+    ghost::cli::CliOptions ruRuGhostDryRun;
+    ruRuGhostDryRun.command = ghost::cli::CommandType::Fix;
+    ruRuGhostDryRun.layoutCode = "ru-RU";
+    ruRuGhostDryRun.dryRun = true;
+    const std::size_t ruRuGhostDryRunBefore = runner.commands.size();
+    const int ruRuGhostDryRunCode = app.run(ruRuGhostDryRun);
+    const std::size_t ruRuGhostDryRunAfter = runner.commands.size();
 
     bool ok = true;
-    ok = expect(nonGhostFixCode == static_cast<int>(ghost::core::ExitCode::FixError), "fix rejects non-ghost ru-RU when ru is installed") && ok;
-    ok = expect(nonGhostFixAfter > nonGhostFixBefore, "non-ghost fix performs validation and ghost checks") && ok;
-    const std::vector<std::string> nonGhostFixCommands =
-        commandSlice(runner.commands, nonGhostFixBefore, nonGhostFixAfter);
+    ok = expect(ruRuGhostFixCode == static_cast<int>(ghost::core::ExitCode::FixError), "fix processes ghost ru-RU when only neutral ru is installed") && ok;
+    ok = expect(ruRuGhostFixAfter > ruRuGhostFixBefore, "ghost ru-RU fix performs validation and ghost checks") && ok;
+    const std::vector<std::string> ruRuGhostFixCommands =
+        commandSlice(runner.commands, ruRuGhostFixBefore, ruRuGhostFixAfter);
     ok = expect(
-             countCommandsContaining(nonGhostFixCommands, "reg export") == 0,
-             "non-ghost fix does not create backup before ghost check") &&
+             countCommandsContaining(ruRuGhostFixCommands, "reg export") == ghost::platform::kRegistryBranches.size(),
+             "ghost ru-RU fix creates backup for all configured registry branches") &&
         ok;
     ok = expect(
-             countCommandsContaining(nonGhostFixCommands, "Set-WinUserLanguageList") == 0,
-             "non-ghost fix does not run add/remove cycle") &&
+             countCommandsContaining(ruRuGhostFixCommands, "Set-WinUserLanguageList") == 2,
+             "ghost ru-RU fix runs add/remove cycle") &&
         ok;
     ok = expect(
-             countCommandsContaining(nonGhostFixCommands, "reg delete") == 0,
-             "non-ghost fix does not run registry cleanup") &&
+             countCommandsContaining(ruRuGhostFixCommands, "reg delete") > 0,
+             "ghost ru-RU fix performs registry cleanup for matched entries") &&
         ok;
 
-    ok = expect(nonGhostDryRunCode == static_cast<int>(ghost::core::ExitCode::FixError), "dry-run rejects non-ghost ru-RU when ru is installed") && ok;
-    ok = expect(nonGhostDryRunAfter > nonGhostDryRunBefore, "non-ghost dry-run performs validation and ghost checks") && ok;
-    const std::vector<std::string> nonGhostDryRunCommands =
-        commandSlice(runner.commands, nonGhostDryRunBefore, nonGhostDryRunAfter);
+    ok = expect(ruRuGhostDryRunCode == static_cast<int>(ghost::core::ExitCode::Success), "dry-run allows ghost ru-RU when only neutral ru is installed") && ok;
+    ok = expect(ruRuGhostDryRunAfter > ruRuGhostDryRunBefore, "ghost ru-RU dry-run performs validation and ghost checks") && ok;
+    const std::vector<std::string> ruRuGhostDryRunCommands =
+        commandSlice(runner.commands, ruRuGhostDryRunBefore, ruRuGhostDryRunAfter);
     ok = expect(
-             countCommandsContaining(nonGhostDryRunCommands, "reg export") == 0,
-             "non-ghost dry-run does not create backup") &&
+             countCommandsContaining(ruRuGhostDryRunCommands, "reg export") == 0,
+             "ghost ru-RU dry-run does not create backup") &&
         ok;
     ok = expect(
-             countCommandsContaining(nonGhostDryRunCommands, "Set-WinUserLanguageList") == 0,
-             "non-ghost dry-run does not run add/remove cycle") &&
+             countCommandsContaining(ruRuGhostDryRunCommands, "Set-WinUserLanguageList") == 0,
+             "ghost ru-RU dry-run does not run add/remove cycle") &&
         ok;
     ok = expect(
-             countCommandsContaining(nonGhostDryRunCommands, "reg delete") == 0,
-             "non-ghost dry-run does not run registry cleanup") &&
+             countCommandsContaining(ruRuGhostDryRunCommands, "reg delete") == 0,
+             "ghost ru-RU dry-run does not run registry cleanup") &&
         ok;
 
     ghost::cli::CliOptions ghostFix;
@@ -540,7 +540,7 @@ int main()
     ok = testRegistryMissingBranchIsSkipped() && ok;
     ok = testInstalledLanguageParsing() && ok;
     ok = testInstalledLanguageEmptyOnFailure() && ok;
-    ok = testFixRejectsNonGhostLayoutAndAllowsGhostLayout() && ok;
+    ok = testFixAllowsGhostLayoutWithExactTagMatching() && ok;
     ok = testCliAndNoAdmin() && ok;
     ok = testApplicationReadFailureHandling() && ok;
 
