@@ -471,6 +471,18 @@ bool testApplicationReadFailureHandling()
 
                 if (command.find("reg export") != std::string::npos)
                 {
+                    const std::string exportPath = FakeCommandRunner::extractQuoted(command, 1);
+                    if (!exportPath.empty())
+                    {
+                        std::ofstream out(exportPath, std::ios::binary | std::ios::trunc);
+                        const std::u16string payload =
+                            u"\uFEFFWindows Registry Editor Version 5.00\r\n\r\n"
+                            u"[HKEY_CURRENT_USER\\Keyboard Layout\\Preload]\r\n"
+                            u"\"1\"=\"00000407\"\r\n";
+                        out.write(
+                            reinterpret_cast<const char*>(payload.data()),
+                            static_cast<std::streamsize>(payload.size() * sizeof(char16_t)));
+                    }
                     return {0, "ok"};
                 }
 
