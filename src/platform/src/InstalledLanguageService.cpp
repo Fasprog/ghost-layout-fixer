@@ -58,6 +58,11 @@ std::vector<std::string> InstalledLanguageService::listInstalledLayoutCodes() co
     const CommandResult result = runner_->run(
         "powershell -NoProfile -Command \"(Get-WinUserLanguageList).LanguageTag\"");
 
+    if (result.exitCode != 0)
+    {
+        return {};
+    }
+
     return parseLanguageTags(result.outputText);
 }
 
