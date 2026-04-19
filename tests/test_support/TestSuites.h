@@ -10,6 +10,7 @@ bool testLayoutFixFailurePathsAndScanCases();
 
 bool testRegistryFailures();
 bool testRegistryMissingBranchIsSkipped();
+bool testRegistryLcidLookupIsCaseInsensitive();
 
 bool testInstalledLanguageParsing();
 bool testInstalledLanguageEmptyOnFailure();
