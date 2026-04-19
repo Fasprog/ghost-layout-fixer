@@ -35,7 +35,19 @@ bool isInstalled(
     const std::unordered_set<std::string>& installedFullCodes)
 {
     const std::string normalizedRegistry = normalizeCode(registryLayout);
-    return installedFullCodes.find(normalizedRegistry) != installedFullCodes.end();
+    if (installedFullCodes.find(normalizedRegistry) != installedFullCodes.end())
+    {
+        return true;
+    }
+
+    const std::size_t registrySeparatorPos = normalizedRegistry.find('-');
+    if (registrySeparatorPos == std::string::npos)
+    {
+        return false;
+    }
+
+    const std::string registryPrimary = normalizedRegistry.substr(0, registrySeparatorPos);
+    return installedFullCodes.find(registryPrimary) != installedFullCodes.end();
 }
 
 bool matchesRequestedLayout(
