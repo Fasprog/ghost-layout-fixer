@@ -71,10 +71,10 @@ bool testRegistryLcidLookupIsCaseInsensitive()
     ok = expect(lowerCaseResult.success, "lowercase HKL LCID is parsed successfully") && ok;
     ok = expect(upperCaseResult.values.size() == 1, "uppercase HKL yields one registry entry") && ok;
     ok = expect(lowerCaseResult.values.size() == 1, "lowercase HKL yields one registry entry") && ok;
-    ok = expect(upperCaseResult.values[0].layoutCode == "fr-FR", "0000040C resolves to fr-FR") && ok;
-    ok = expect(lowerCaseResult.values[0].layoutCode == "fr-FR", "0000040c resolves to fr-FR") && ok;
+    ok = expect(upperCaseResult.values[0] == "fr-FR", "0000040C resolves to fr-FR") && ok;
+    ok = expect(lowerCaseResult.values[0] == "fr-FR", "0000040c resolves to fr-FR") && ok;
     ok = expect(
-             upperCaseResult.values[0].layoutCode == lowerCaseResult.values[0].layoutCode,
+             upperCaseResult.values[0] == lowerCaseResult.values[0],
              "uppercase and lowercase HKL LCID variants resolve identically") &&
         ok;
     return ok;
