@@ -34,3 +34,18 @@ bool testRegistryFailures()
     ok = expect(!errors.empty(), "registry delete returns error details on failure") && ok;
     return ok;
 }
+
+bool testRegistryMissingBranchIsSkipped()
+{
+    FakeCommandRunner runner;
+    runner.rules.push_back({"GetCultures", 0, "0409=en-US\n"});
+    runner.rules.push_back({"reg query", 1, "ERROR: The system was unable to find the specified registry key or value."});
+    const ghost::platform::RegistryService registryService(&runner);
+
+    const ghost::platform::RegistryLayoutsResult layoutsResult = registryService.listLayoutCodesFromRegistry();
+
+    bool ok = true;
+    ok = expect(layoutsResult.success, "missing whitelist branch is treated as empty state, not fatal error") && ok;
+    ok = expect(layoutsResult.values.empty(), "missing whitelist branches produce empty registry layout list") && ok;
+    return ok;
+}

@@ -537,6 +537,7 @@ int main()
     ok = testRestoreBackupValidationAndFailure() && ok;
     ok = testLayoutFixFailurePathsAndScanCases() && ok;
     ok = testRegistryFailures() && ok;
+    ok = testRegistryMissingBranchIsSkipped() && ok;
     ok = testInstalledLanguageParsing() && ok;
     ok = testInstalledLanguageEmptyOnFailure() && ok;
     ok = testFixRejectsNonGhostLayoutAndAllowsGhostLayout() && ok;

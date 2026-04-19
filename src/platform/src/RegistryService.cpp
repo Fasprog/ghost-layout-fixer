@@ -174,6 +174,18 @@ RegistrySnapshotsResult readRegistrySnapshots(const ghost::platform::ICommandRun
         const ghost::platform::CommandResult query = runner.run("reg query \"" + branchPath + "\"");
         if (query.exitCode != 0)
         {
+            const std::string& output = query.outputText;
+            const bool isMissingBranch =
+                output.find("unable to find the specified registry key or value") != std::string::npos ||
+                output.find("The system was unable to find the specified registry key or value") != std::string::npos ||
+                output.find("cannot find the file specified") != std::string::npos ||
+                output.find("не удается найти указанный раздел реестра или параметр") != std::string::npos ||
+                output.find("Системе не удается найти указанный путь") != std::string::npos;
+            if (isMissingBranch)
+            {
+                continue;
+            }
+
             snapshotsResult.success = false;
             snapshotsResult.error =
                 "failed to query registry branch " + branchPath +

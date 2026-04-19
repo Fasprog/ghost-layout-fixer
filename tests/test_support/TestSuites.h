@@ -9,6 +9,7 @@ bool testRestoreBackupValidationAndFailure();
 bool testLayoutFixFailurePathsAndScanCases();
 
 bool testRegistryFailures();
+bool testRegistryMissingBranchIsSkipped();
 
 bool testInstalledLanguageParsing();
 bool testInstalledLanguageEmptyOnFailure();
