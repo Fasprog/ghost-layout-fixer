@@ -100,8 +100,22 @@ int ApplicationService::run(const ghost::cli::CliOptions& options) const
 
     if (options.command == ghost::cli::CommandType::Scan)
     {
-        const std::vector<std::string> registryLayouts = registryService_.listLayoutCodesFromRegistry();
-        const std::vector<std::string> installedLayouts = installedLanguageService_.listInstalledLayoutCodes();
+        const ghost::platform::RegistryLayoutsResult registryRead = registryService_.listLayoutCodesFromRegistrySafe();
+        if (!registryRead.success)
+        {
+            printer_.print("[scan] error: failed to read registry layouts: " + registryRead.error);
+            return static_cast<int>(ghost::core::ExitCode::GeneralError);
+        }
+
+        const ghost::platform::InstalledLayoutsResult installedRead = installedLanguageService_.listInstalledLayoutCodesSafe();
+        if (!installedRead.success)
+        {
+            printer_.print("[scan] error: failed to read installed language tags: " + installedRead.error);
+            return static_cast<int>(ghost::core::ExitCode::GeneralError);
+        }
+
+        const std::vector<std::string>& registryLayouts = registryRead.layouts;
+        const std::vector<std::string>& installedLayouts = installedRead.layouts;
         const ghost::core::ScanResult scanResult = layoutFixService_.scan(registryLayouts, installedLayouts);
         printer_.print("[scan] registry layouts: " + joinLayouts(scanResult.registryLayouts));
         printer_.print("[scan] installed language tags: " + joinLayouts(scanResult.installedLayouts));
@@ -148,8 +162,22 @@ int ApplicationService::run(const ghost::cli::CliOptions& options) const
             return static_cast<int>(ghost::core::ExitCode::FixError);
         }
 
-        const std::vector<std::string> registryLayouts = registryService_.listLayoutCodesFromRegistry();
-        const std::vector<std::string> installedLayouts = installedLanguageService_.listInstalledLayoutCodes();
+        const ghost::platform::RegistryLayoutsResult registryRead = registryService_.listLayoutCodesFromRegistrySafe();
+        if (!registryRead.success)
+        {
+            printer_.print("[fix --dry-run] error: failed to read registry layouts: " + registryRead.error);
+            return static_cast<int>(ghost::core::ExitCode::FixError);
+        }
+
+        const ghost::platform::InstalledLayoutsResult installedRead = installedLanguageService_.listInstalledLayoutCodesSafe();
+        if (!installedRead.success)
+        {
+            printer_.print("[fix --dry-run] error: failed to read installed language tags: " + installedRead.error);
+            return static_cast<int>(ghost::core::ExitCode::FixError);
+        }
+
+        const std::vector<std::string>& registryLayouts = registryRead.layouts;
+        const std::vector<std::string>& installedLayouts = installedRead.layouts;
         if (!layoutFixService_.isGhostLayout(*options.layoutCode, registryLayouts, installedLayouts))
         {
             printer_.print("[fix --dry-run] error: requested layout is not a ghost layout: " + *options.layoutCode);
@@ -157,8 +185,14 @@ int ApplicationService::run(const ghost::cli::CliOptions& options) const
         }
 
         const std::string backupPath = backupService_.makeBackupPath();
-        const std::vector<ghost::platform::RegistryMatch> matches = registryService_.findLayoutMatches(*options.layoutCode);
-        const ghost::core::FixPlan plan = layoutFixService_.buildDryRunPlan(*options.layoutCode, toMatchSummaries(matches), backupPath);
+        const ghost::platform::RegistryMatchesResult matchRead = registryService_.findLayoutMatchesSafe(*options.layoutCode);
+        if (!matchRead.success)
+        {
+            printer_.print("[fix --dry-run] error: failed to read registry layouts: " + matchRead.error);
+            return static_cast<int>(ghost::core::ExitCode::FixError);
+        }
+        const ghost::core::FixPlan plan =
+            layoutFixService_.buildDryRunPlan(*options.layoutCode, toMatchSummaries(matchRead.matches), backupPath);
 
         printer_.print("[fix --dry-run] layout: " + *options.layoutCode);
         for (const std::string& step : plan.plannedSteps)
@@ -183,8 +217,22 @@ int ApplicationService::run(const ghost::cli::CliOptions& options) const
             return static_cast<int>(ghost::core::ExitCode::FixError);
         }
 
-        const std::vector<std::string> registryLayouts = registryService_.listLayoutCodesFromRegistry();
-        const std::vector<std::string> installedLayouts = installedLanguageService_.listInstalledLayoutCodes();
+        const ghost::platform::RegistryLayoutsResult registryRead = registryService_.listLayoutCodesFromRegistrySafe();
+        if (!registryRead.success)
+        {
+            printer_.print("[fix] error: failed to read registry layouts: " + registryRead.error);
+            return static_cast<int>(ghost::core::ExitCode::FixError);
+        }
+
+        const ghost::platform::InstalledLayoutsResult installedRead = installedLanguageService_.listInstalledLayoutCodesSafe();
+        if (!installedRead.success)
+        {
+            printer_.print("[fix] error: failed to read installed language tags: " + installedRead.error);
+            return static_cast<int>(ghost::core::ExitCode::FixError);
+        }
+
+        const std::vector<std::string>& registryLayouts = registryRead.layouts;
+        const std::vector<std::string>& installedLayouts = installedRead.layouts;
         if (!layoutFixService_.isGhostLayout(*options.layoutCode, registryLayouts, installedLayouts))
         {
             printer_.print("[fix] error: requested layout is not a ghost layout: " + *options.layoutCode);
@@ -210,8 +258,13 @@ int ApplicationService::run(const ghost::cli::CliOptions& options) const
             std::string("[fix] standard add/remove: ") +
             (fixReport.errors.empty() ? "completed" : "failed"));
 
-        const std::vector<ghost::platform::RegistryMatch> actualMatches =
-            registryService_.findLayoutMatches(*options.layoutCode);
+        const ghost::platform::RegistryMatchesResult actualMatchesRead = registryService_.findLayoutMatchesSafe(*options.layoutCode);
+        if (!actualMatchesRead.success)
+        {
+            printer_.print("[fix] error: failed to read registry layouts: " + actualMatchesRead.error);
+            return static_cast<int>(ghost::core::ExitCode::FixError);
+        }
+        const std::vector<ghost::platform::RegistryMatch>& actualMatches = actualMatchesRead.matches;
 
         if (actualMatches.empty())
         {
@@ -230,10 +283,14 @@ int ApplicationService::run(const ghost::cli::CliOptions& options) const
                     : "failed"));
         }
 
-        const std::vector<ghost::platform::RegistryMatch> finalTargetMatches =
-            registryService_.findLayoutMatches(*options.layoutCode);
+        const ghost::platform::RegistryMatchesResult finalTargetRead = registryService_.findLayoutMatchesSafe(*options.layoutCode);
+        if (!finalTargetRead.success)
+        {
+            printer_.print("[fix] error: failed to read registry layouts: " + finalTargetRead.error);
+            return static_cast<int>(ghost::core::ExitCode::FixError);
+        }
 
-        fixReport.success = fixReport.errors.empty() && finalTargetMatches.empty();
+        fixReport.success = fixReport.errors.empty() && finalTargetRead.matches.empty();
 
         for (const std::string& error : fixReport.errors)
         {

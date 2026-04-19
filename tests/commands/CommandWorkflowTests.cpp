@@ -268,10 +268,20 @@ bool testRestoreBackupValidationAndFailure()
     std::ofstream(upperCaseExtension) << "Windows Registry Editor Version 5.00\n";
     const ghost::core::RestoreReport upperCaseExtensionReport = backupService.restoreBackup(upperCaseExtension.string());
 
+    const std::filesystem::path missingHeader = std::filesystem::temp_directory_path() / "ghost-layout-fixer-missing-header.reg";
+    std::ofstream(missingHeader) << "REGEDIT4\n";
+    const ghost::core::RestoreReport missingHeaderReport = backupService.restoreBackup(missingHeader.string());
+
     bool ok = true;
     ok = expect(!missingReport.success, "restore fails on missing backup") && ok;
     ok = expect(!invalidReport.success, "restore fails on invalid backup extension") && ok;
     ok = expect(!failedImportReport.success, "restore reports reg import failure") && ok;
+    ok = expect(
+             !missingHeaderReport.success &&
+                 !missingHeaderReport.errors.empty() &&
+                 missingHeaderReport.errors.front().find("missing Windows Registry Editor Version 5.00 header") != std::string::npos,
+             "restore rejects .reg file without required header before import") &&
+        ok;
     ok = expect(
              !upperCaseExtensionReport.errors.empty() &&
                  upperCaseExtensionReport.errors.front().find("invalid extension") == std::string::npos,
@@ -281,6 +291,7 @@ bool testRestoreBackupValidationAndFailure()
     std::filesystem::remove(invalid);
     std::filesystem::remove(existing);
     std::filesystem::remove(upperCaseExtension);
+    std::filesystem::remove(missingHeader);
     return ok;
 }
 
@@ -291,7 +302,12 @@ bool testRegistryFailures()
     queryFailRunner.rules.push_back({"reg query", 1, "query failed"});
     const ghost::platform::RegistryService registryQueryFail(&queryFailRunner);
 
-    const std::vector<std::string> layouts = registryQueryFail.listLayoutCodesFromRegistry();
+    const ghost::platform::RegistryLayoutsResult layoutsRead = registryQueryFail.listLayoutCodesFromRegistrySafe();
+
+    FakeCommandRunner culturesFailRunner;
+    culturesFailRunner.rules.push_back({"GetCultures", 1, "culture failed"});
+    const ghost::platform::RegistryService registryCulturesFail(&culturesFailRunner);
+    const ghost::platform::RegistryLayoutsResult culturesRead = registryCulturesFail.listLayoutCodesFromRegistrySafe();
 
     FakeCommandRunner deleteFailRunner;
     deleteFailRunner.rules.push_back({"reg delete", 1, "delete failed"});
@@ -300,8 +316,71 @@ bool testRegistryFailures()
     const std::vector<std::string> errors = registryDeleteFail.deleteMatches(matches);
 
     bool ok = true;
-    ok = expect(layouts.empty(), "registry list is empty when reg query fails") && ok;
+    ok = expect(!layoutsRead.success, "registry safe list reports error when reg query fails") && ok;
+    ok = expect(!culturesRead.success, "registry safe list reports error when LCID mapping fails") && ok;
     ok = expect(!errors.empty(), "registry delete returns error details on failure") && ok;
+    return ok;
+}
+
+bool testSafeReadFailuresStopScanAndFixBeforeBackup()
+{
+    FakeCommandRunner runner;
+    runner.rules.push_back({"GetCultures", 0, "0409=en-US\n"});
+    runner.rules.push_back({"reg query", 0, "    1    REG_SZ    00000409\n"});
+    runner.rules.push_back({"(Get-WinUserLanguageList).LanguageTag", 1, "powershell failed"});
+    runner.rules.push_back({"reg export", 0, "ok"});
+
+    ghost::core::BackupService backupService(&runner);
+    ghost::platform::RegistryService registryService(&runner);
+    ghost::platform::InstalledLanguageService installedLanguageService(&runner);
+    ghost::core::LayoutFixService layoutFixService(&runner);
+    ghost::report::ReportPrinter printer;
+    FakePrivilegeService admin;
+    ghost::app::ApplicationService app(
+        admin,
+        backupService,
+        registryService,
+        installedLanguageService,
+        layoutFixService,
+        printer);
+
+    ghost::cli::CliOptions scanOptions;
+    scanOptions.command = ghost::cli::CommandType::Scan;
+    const std::size_t scanBefore = runner.commands.size();
+    const int scanCode = app.run(scanOptions);
+    const std::size_t scanAfter = runner.commands.size();
+
+    ghost::cli::CliOptions dryRunOptions;
+    dryRunOptions.command = ghost::cli::CommandType::Fix;
+    dryRunOptions.layoutCode = "en-US";
+    dryRunOptions.dryRun = true;
+    const std::size_t dryRunBefore = runner.commands.size();
+    const int dryRunCode = app.run(dryRunOptions);
+    const std::size_t dryRunAfter = runner.commands.size();
+
+    ghost::cli::CliOptions fixOptions;
+    fixOptions.command = ghost::cli::CommandType::Fix;
+    fixOptions.layoutCode = "en-US";
+    const std::size_t fixBefore = runner.commands.size();
+    const int fixCode = app.run(fixOptions);
+    const std::size_t fixAfter = runner.commands.size();
+
+    bool ok = true;
+    ok = expect(scanCode == static_cast<int>(ghost::core::ExitCode::GeneralError), "scan fails when installed language read fails") && ok;
+    ok = expect(dryRunCode == static_cast<int>(ghost::core::ExitCode::FixError), "fix --dry-run fails when installed language read fails") && ok;
+    ok = expect(fixCode == static_cast<int>(ghost::core::ExitCode::FixError), "fix fails when installed language read fails") && ok;
+    ok = expect(
+             countCommandsContaining(commandSlice(runner.commands, scanBefore, scanAfter), "reg export") == 0,
+             "scan failure does not run backup commands") &&
+        ok;
+    ok = expect(
+             countCommandsContaining(commandSlice(runner.commands, dryRunBefore, dryRunAfter), "reg export") == 0,
+             "fix --dry-run failure does not create backup") &&
+        ok;
+    ok = expect(
+             countCommandsContaining(commandSlice(runner.commands, fixBefore, fixAfter), "reg export") == 0,
+             "fix failure before data read does not create backup") &&
+        ok;
     return ok;
 }
 
@@ -332,6 +411,21 @@ bool testLayoutFixFailurePathsAndScanCases()
     ok = expect(!enUsGhostWithOnlyEnGbInRegistry, "ghost check requires exact normalized layout match between request and registry") && ok;
     ok = expect(!ruRuGhostWithInstalledRu, "ghost check treats ru and ru-RU as the same installed language") && ok;
     ok = expect(deDeGhost, "ghost check returns true when layout exists in registry and is not installed") && ok;
+    return ok;
+}
+
+bool testInstalledLanguageServiceSafeFailure()
+{
+    FakeCommandRunner runner;
+    runner.rules.push_back({"(Get-WinUserLanguageList).LanguageTag", 1, "powershell failed"});
+    const ghost::platform::InstalledLanguageService service(&runner);
+
+    const ghost::platform::InstalledLayoutsResult safeResult = service.listInstalledLayoutCodesSafe();
+    const std::vector<std::string> legacyResult = service.listInstalledLayoutCodes();
+
+    bool ok = true;
+    ok = expect(!safeResult.success, "installed language safe read reports powershell failure") && ok;
+    ok = expect(legacyResult.empty(), "legacy installed language read keeps compatibility and returns empty list") && ok;
     return ok;
 }
 
@@ -549,6 +643,8 @@ int main()
     ok = testRestoreBackupValidationAndFailure() && ok;
     ok = testRegistryFailures() && ok;
     ok = testLayoutFixFailurePathsAndScanCases() && ok;
+    ok = testInstalledLanguageServiceSafeFailure() && ok;
+    ok = testSafeReadFailuresStopScanAndFixBeforeBackup() && ok;
     ok = testFixRejectsNonGhostLayoutAndAllowsGhostLayout() && ok;
     ok = testCliAndNoAdmin() && ok;
 

@@ -3,6 +3,7 @@
 #include <src/platform/SystemCommandRunner.h>
 
 #include <sstream>
+#include <string>
 #include <unordered_set>
 
 namespace
@@ -55,10 +56,24 @@ InstalledLanguageService::InstalledLanguageService(const ICommandRunner* runner)
 
 std::vector<std::string> InstalledLanguageService::listInstalledLayoutCodes() const
 {
+    const InstalledLayoutsResult safeResult = listInstalledLayoutCodesSafe();
+    return safeResult.layouts;
+}
+
+InstalledLayoutsResult InstalledLanguageService::listInstalledLayoutCodesSafe() const
+{
+    InstalledLayoutsResult safeResult;
     const CommandResult result = runner_->run(
         "powershell -NoProfile -Command \"(Get-WinUserLanguageList).LanguageTag\"");
+    if (result.exitCode != 0)
+    {
+        safeResult.error = "powershell exited with code " + std::to_string(result.exitCode) + ": " + result.outputText;
+        return safeResult;
+    }
 
-    return parseLanguageTags(result.outputText);
+    safeResult.layouts = parseLanguageTags(result.outputText);
+    safeResult.success = true;
+    return safeResult;
 }
 
 } // namespace ghost::platform

@@ -8,6 +8,7 @@
 #include <string_view>
 #include <unordered_map>
 #include <unordered_set>
+#include <utility>
 
 namespace
 {
@@ -18,6 +19,20 @@ struct RegistrySnapshot
     std::string valueName;
     std::string valueData;
     std::string layoutCode;
+};
+
+struct LcidMapResult
+{
+    bool success{false};
+    std::unordered_map<std::string, std::string> mapping;
+    std::string error;
+};
+
+struct RegistryReadResult
+{
+    bool success{false};
+    std::vector<RegistrySnapshot> snapshots;
+    std::string error;
 };
 
 const ghost::platform::ICommandRunner& defaultRunner()
@@ -40,18 +55,19 @@ std::string trimWhitespace(const std::string& value)
     return trimmed;
 }
 
-std::unordered_map<std::string, std::string> buildLcidToLanguageTagMap(const ghost::platform::ICommandRunner& runner)
+LcidMapResult buildLcidToLanguageTagMap(const ghost::platform::ICommandRunner& runner)
 {
+    LcidMapResult mapResult;
     const ghost::platform::CommandResult result = runner.run(
         "powershell -NoProfile -Command "
         "\"[System.Globalization.CultureInfo]::GetCultures("
         "[System.Globalization.CultureTypes]::SpecificCultures"
         ") | ForEach-Object { '{0:X4}={1}' -f $_.LCID, $_.Name }\"");
 
-    std::unordered_map<std::string, std::string> mapping;
     if (result.exitCode != 0)
     {
-        return mapping;
+        mapResult.error = "failed to build LCID mapping (exit code " + std::to_string(result.exitCode) + "): " + result.outputText;
+        return mapResult;
     }
 
     std::string line;
@@ -68,11 +84,18 @@ std::unordered_map<std::string, std::string> buildLcidToLanguageTagMap(const gho
         const std::string languageTag = trimWhitespace(line.substr(separatorPos + 1));
         if (!lcidHex.empty() && !languageTag.empty())
         {
-            mapping[lcidHex] = languageTag;
+            mapResult.mapping[lcidHex] = languageTag;
         }
     }
 
-    return mapping;
+    if (mapResult.mapping.empty())
+    {
+        mapResult.error = "failed to build LCID mapping: empty result";
+        return mapResult;
+    }
+
+    mapResult.success = true;
+    return mapResult;
 }
 
 std::string extractLanguageIdHex(const std::string& hkl)
@@ -134,13 +157,14 @@ std::vector<RegistrySnapshot> parseRegistryEntries(
     return entries;
 }
 
-std::vector<RegistrySnapshot> readRegistrySnapshots(const ghost::platform::ICommandRunner& runner)
+RegistryReadResult readRegistrySnapshots(const ghost::platform::ICommandRunner& runner)
 {
-    const std::unordered_map<std::string, std::string> lcidMapping = buildLcidToLanguageTagMap(runner);
-    std::vector<RegistrySnapshot> snapshots;
-    if (lcidMapping.empty())
+    RegistryReadResult readResult;
+    const LcidMapResult mapResult = buildLcidToLanguageTagMap(runner);
+    if (!mapResult.success)
     {
-        return snapshots;
+        readResult.error = mapResult.error;
+        return readResult;
     }
 
     for (const std::string& branchPath : ghost::platform::kRegistryBranches)
@@ -148,14 +172,17 @@ std::vector<RegistrySnapshot> readRegistrySnapshots(const ghost::platform::IComm
         const ghost::platform::CommandResult query = runner.run("reg query \"" + branchPath + "\"");
         if (query.exitCode != 0)
         {
-            continue;
+            readResult.error = "failed to query registry branch " + branchPath + " (exit code " +
+                               std::to_string(query.exitCode) + "): " + query.outputText;
+            return readResult;
         }
 
-        const std::vector<RegistrySnapshot> parsed = parseRegistryEntries(query.outputText, branchPath, lcidMapping);
-        snapshots.insert(snapshots.end(), parsed.begin(), parsed.end());
+        const std::vector<RegistrySnapshot> parsed = parseRegistryEntries(query.outputText, branchPath, mapResult.mapping);
+        readResult.snapshots.insert(readResult.snapshots.end(), parsed.begin(), parsed.end());
     }
 
-    return snapshots;
+    readResult.success = true;
+    return readResult;
 }
 
 bool isSafeRegistryBranchPath(const std::string& value)
@@ -216,9 +243,22 @@ RegistryService::RegistryService(const ICommandRunner* runner) : runner_(runner 
 
 std::vector<RegistryMatch> RegistryService::findLayoutMatches(const std::string& layoutCode) const
 {
-    const std::vector<RegistrySnapshot> snapshots = readRegistrySnapshots(*runner_);
+    const RegistryMatchesResult safeResult = findLayoutMatchesSafe(layoutCode);
+    return safeResult.matches;
+}
+
+RegistryMatchesResult RegistryService::findLayoutMatchesSafe(const std::string& layoutCode) const
+{
+    RegistryMatchesResult safeResult;
+    const RegistryReadResult readResult = readRegistrySnapshots(*runner_);
+    if (!readResult.success)
+    {
+        safeResult.error = readResult.error;
+        return safeResult;
+    }
+
     std::vector<RegistryMatch> matches;
-    for (const RegistrySnapshot& snapshot : snapshots)
+    for (const RegistrySnapshot& snapshot : readResult.snapshots)
     {
         if (snapshot.layoutCode != layoutCode)
         {
@@ -232,15 +272,30 @@ std::vector<RegistryMatch> RegistryService::findLayoutMatches(const std::string&
         matches.push_back(match);
     }
 
-    return matches;
+    safeResult.matches = std::move(matches);
+    safeResult.success = true;
+    return safeResult;
 }
 
 std::vector<std::string> RegistryService::listLayoutCodesFromRegistry() const
 {
-    const std::vector<RegistrySnapshot> snapshots = readRegistrySnapshots(*runner_);
+    const RegistryLayoutsResult safeResult = listLayoutCodesFromRegistrySafe();
+    return safeResult.layouts;
+}
+
+RegistryLayoutsResult RegistryService::listLayoutCodesFromRegistrySafe() const
+{
+    RegistryLayoutsResult safeResult;
+    const RegistryReadResult readResult = readRegistrySnapshots(*runner_);
+    if (!readResult.success)
+    {
+        safeResult.error = readResult.error;
+        return safeResult;
+    }
+
     std::unordered_set<std::string> seenLayouts;
     std::vector<std::string> layouts;
-    for (const RegistrySnapshot& snapshot : snapshots)
+    for (const RegistrySnapshot& snapshot : readResult.snapshots)
     {
         if (seenLayouts.insert(snapshot.layoutCode).second)
         {
@@ -248,7 +303,9 @@ std::vector<std::string> RegistryService::listLayoutCodesFromRegistry() const
         }
     }
 
-    return layouts;
+    safeResult.layouts = std::move(layouts);
+    safeResult.success = true;
+    return safeResult;
 }
 
 std::vector<std::string> RegistryService::deleteMatches(const std::vector<RegistryMatch>& matches) const

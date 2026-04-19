@@ -8,6 +8,7 @@
 #include <filesystem>
 #include <fstream>
 #include <iomanip>
+#include <iterator>
 #include <sstream>
 #include <string>
 #include <string_view>
@@ -116,14 +117,70 @@ bool isSafePathForCommand(const std::string& path)
 
 std::filesystem::path executableDirectory()
 {
-    wchar_t buffer[MAX_PATH] = {};
-    const DWORD length = GetModuleFileNameW(nullptr, buffer, MAX_PATH);
-    if (length == 0 || length == MAX_PATH)
+    std::vector<wchar_t> buffer(512, L'\0');
+    for (;;)
     {
-        return {};
+        const DWORD length = GetModuleFileNameW(nullptr, buffer.data(), static_cast<DWORD>(buffer.size()));
+        if (length == 0)
+        {
+            return {};
+        }
+
+        if (length + 1 < buffer.size())
+        {
+            buffer.resize(length);
+            return std::filesystem::path(buffer.data()).parent_path();
+        }
+
+        if (buffer.size() >= 32768)
+        {
+            return {};
+        }
+
+        buffer.resize(buffer.size() * 2, L'\0');
+    }
+}
+
+bool hasRequiredRegHeader(const std::filesystem::path& path)
+{
+    std::ifstream in(path, std::ios::binary);
+    if (!in)
+    {
+        return false;
     }
 
-    return std::filesystem::path(buffer).parent_path();
+    const std::string bytes((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+    if (bytes.empty())
+    {
+        return false;
+    }
+
+    static const std::string kHeader = "Windows Registry Editor Version 5.00";
+    static const std::string kUtf16Header =
+        "\x57\x00\x69\x00\x6E\x00\x64\x00\x6F\x00\x77\x00\x73\x00\x20\x00\x52\x00\x65\x00\x67\x00\x69\x00\x73\x00\x74\x00\x72\x00\x79\x00\x20\x00\x45\x00\x64\x00\x69\x00\x74\x00\x6F\x00\x72\x00\x20\x00\x56\x00\x65\x00\x72\x00\x73\x00\x69\x00\x6F\x00\x6E\x00\x20\x00\x35\x00\x2E\x00\x30\x00\x30\x00";
+
+    std::size_t offset = 0;
+    if (startsWithUtf16LeBom(bytes))
+    {
+        offset = 2;
+    }
+    else if (bytes.size() >= 3 && static_cast<unsigned char>(bytes[0]) == 0xEF &&
+             static_cast<unsigned char>(bytes[1]) == 0xBB && static_cast<unsigned char>(bytes[2]) == 0xBF)
+    {
+        offset = 3;
+    }
+
+    if (bytes.size() >= offset + kHeader.size() && bytes.compare(offset, kHeader.size(), kHeader) == 0)
+    {
+        return true;
+    }
+
+    if (bytes.size() >= offset + kUtf16Header.size() && bytes.compare(offset, kUtf16Header.size(), kUtf16Header) == 0)
+    {
+        return true;
+    }
+
+    return false;
 }
 
 } // namespace
@@ -149,7 +206,13 @@ std::string BackupService::makeBackupPath() const
     name << std::put_time(&utc, "%Y%m%d-%H%M%S");
     name << ".reg";
 
-    const std::filesystem::path backupDirectory = executableDirectory() / "backups";
+    std::filesystem::path baseDirectory = executableDirectory();
+    if (baseDirectory.empty())
+    {
+        baseDirectory = std::filesystem::current_path();
+    }
+
+    const std::filesystem::path backupDirectory = baseDirectory / "backups";
     return (backupDirectory / name.str()).string();
 }
 
@@ -291,6 +354,12 @@ RestoreReport BackupService::restoreBackup(const std::string& backupPath) const
     if (std::filesystem::is_regular_file(backupPath) && std::filesystem::file_size(backupPath) == 0)
     {
         report.errors.push_back("backup file is empty: " + backupPath);
+        return report;
+    }
+
+    if (!hasRequiredRegHeader(std::filesystem::path(backupPath)))
+    {
+        report.errors.push_back("backup file is invalid: missing Windows Registry Editor Version 5.00 header");
         return report;
     }
 

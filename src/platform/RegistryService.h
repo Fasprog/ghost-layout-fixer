@@ -16,16 +16,36 @@ struct RegistryMatch
     std::string valueData;
 };
 
+struct RegistryLayoutsResult
+{
+    bool success{false};
+    std::vector<std::string> layouts;
+    std::string error;
+};
+
+struct RegistryMatchesResult
+{
+    bool success{false};
+    std::vector<RegistryMatch> matches;
+    std::string error;
+};
+
 /// @brief Сервис доступа к whitelist-веткам реестра.
 class RegistryService
 {
 public:
     explicit RegistryService(const ICommandRunner* runner = nullptr);
 
+    /// @brief Безопасно ищет совпадения по коду раскладки.
+    RegistryMatchesResult findLayoutMatchesSafe(const std::string& layoutCode) const;
+
     /// @brief Ищет совпадения по коду раскладки.
     /// @param[in] layoutCode Код раскладки (например, en-GB).
     /// @return Список совпадений в реестре.
     std::vector<RegistryMatch> findLayoutMatches(const std::string& layoutCode) const;
+
+    /// @brief Безопасно получает все коды раскладок из реестра.
+    RegistryLayoutsResult listLayoutCodesFromRegistrySafe() const;
 
     /// @brief Получает все коды раскладок, найденные в реестре.
     /// @return Список кодов раскладок из whitelist-веток.
