@@ -11,6 +11,7 @@ bool testLayoutFixFailurePathsAndScanCases();
 bool testRegistryFailures();
 bool testRegistryMissingBranchIsSkipped();
 bool testRegistryLcidLookupIsCaseInsensitive();
+bool testRegistryRecursiveUserProfileSubkeys();
 
 bool testInstalledLanguageParsing();
 bool testInstalledLanguageEmptyOnFailure();

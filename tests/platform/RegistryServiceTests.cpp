@@ -79,3 +79,95 @@ bool testRegistryLcidLookupIsCaseInsensitive()
         ok;
     return ok;
 }
+
+
+bool testRegistryRecursiveUserProfileSubkeys()
+{
+    FakeCommandRunner listRunner;
+    listRunner.rules.push_back({"GetCultures", 0, "0809=en-GB\n0409=en-US\n"});
+    listRunner.rules.push_back(
+        {"reg query \"HKEY_CURRENT_USER\\Keyboard Layout\\Preload\"", 0, "    1    REG_SZ    00000409\n"});
+    listRunner.rules.push_back(
+        {"reg query \"HKEY_CURRENT_USER\\Keyboard Layout\\Substitutes\"", 0, ""});
+    listRunner.rules.push_back(
+        {"reg query \"HKEY_USERS\\.DEFAULT\\Keyboard Layout\\Preload\"", 0, ""});
+    listRunner.rules.push_back(
+        {"reg query \"HKEY_USERS\\.DEFAULT\\Keyboard Layout\\Substitutes\"", 0, ""});
+    listRunner.rules.push_back(
+        {"reg query \"HKEY_CURRENT_USER\\Control Panel\\International\\User Profile\" /s", 0,
+         "HKEY_CURRENT_USER\\Control Panel\\International\\User Profile\n"
+         "    Languages    REG_SZ    00000409\n"
+         "\n"
+         "HKEY_CURRENT_USER\\Control Panel\\International\\User Profile\\en-GB\n"
+         "    1    REG_SZ    00000809\n"});
+    listRunner.rules.push_back(
+        {"reg query \"HKEY_USERS\\.DEFAULT\\Control Panel\\International\\User Profile\" /s", 1,
+         "ERROR: The system was unable to find the specified registry key or value."});
+    listRunner.rules.push_back(
+        {"reg query \"HKEY_USERS\\.DEFAULT\\Control Panel\\International\\User Profile System Backup\" /s", 1,
+         "ERROR: The system was unable to find the specified registry key or value."});
+
+    const ghost::platform::RegistryService listService(&listRunner);
+    const ghost::platform::RegistryLayoutsResult layoutsResult = listService.listLayoutCodesFromRegistry();
+
+    FakeCommandRunner matchRunner = listRunner;
+    matchRunner.commands.clear();
+    const ghost::platform::RegistryService matchService(&matchRunner);
+    const ghost::platform::RegistryMatchesResult matchesResult = matchService.findLayoutMatches("en-GB");
+
+    FakeCommandRunner deleteRunner;
+    deleteRunner.rules.push_back(
+        {"reg delete \"HKEY_CURRENT_USER\\Control Panel\\International\\User Profile\\en-GB\" /v \"1\" /f", 0, ""});
+    const ghost::platform::RegistryService deleteService(&deleteRunner);
+
+    std::vector<ghost::platform::RegistryMatch> matchesToDelete;
+    if (!matchesResult.values.empty())
+    {
+        matchesToDelete.push_back(matchesResult.values.front());
+    }
+    const std::vector<std::string> deleteErrors = deleteService.deleteMatches(matchesToDelete);
+
+    bool usedRecursiveUserProfileQuery = false;
+    bool usedNonRecursivePreloadQuery = false;
+    for (const std::string& command : listRunner.commands)
+    {
+        if (command == "reg query \"HKEY_CURRENT_USER\\Control Panel\\International\\User Profile\" /s")
+        {
+            usedRecursiveUserProfileQuery = true;
+        }
+
+        if (command == "reg query \"HKEY_CURRENT_USER\\Keyboard Layout\\Preload\"")
+        {
+            usedNonRecursivePreloadQuery = true;
+        }
+    }
+
+    bool ok = true;
+    ok = expect(layoutsResult.success, "registry list succeeds when recursive user profile query returns child key values") && ok;
+    ok = expect(layoutsResult.values.size() == 2, "registry list keeps values from recursive and non-recursive branches") && ok;
+    ok = expect(layoutsResult.values[0] == "en-US", "non-recursive preload branch still works in original mode") && ok;
+    ok = expect(layoutsResult.values[1] == "en-GB", "recursive user profile child key contributes layout code") && ok;
+    ok = expect(usedRecursiveUserProfileQuery, "user profile branch uses recursive reg query /s") && ok;
+    ok = expect(usedNonRecursivePreloadQuery, "preload branch remains non-recursive") && ok;
+
+    ok = expect(matchesResult.success, "find layout matches succeeds for recursive branch output") && ok;
+    ok = expect(matchesResult.values.size() == 1, "find layout matches returns child key match") && ok;
+    if (!matchesResult.values.empty())
+    {
+        ok = expect(
+                 matchesResult.values[0].branchPath ==
+                     "HKEY_CURRENT_USER\\Control Panel\\International\\User Profile\\en-GB",
+                 "match branchPath points to actual child key path") &&
+             ok;
+        ok = expect(matchesResult.values[0].valueName == "1", "match keeps child key value name") && ok;
+    }
+
+    ok = expect(deleteErrors.empty(), "delete matches succeeds for child key path") && ok;
+    ok = expect(
+             !deleteRunner.commands.empty() &&
+                 deleteRunner.commands.front() ==
+                     "reg delete \"HKEY_CURRENT_USER\\Control Panel\\International\\User Profile\\en-GB\" /v \"1\" /f",
+             "delete matches uses actual child key path") &&
+        ok;
+    return ok;
+}

@@ -40,6 +40,16 @@ const ghost::platform::ICommandRunner& defaultRunner()
     return runner;
 }
 
+const std::unordered_set<std::string> kRecursiveRegistryBranches = {
+    "HKEY_CURRENT_USER\\Control Panel\\International\\User Profile",
+    "HKEY_USERS\\.DEFAULT\\Control Panel\\International\\User Profile",
+    "HKEY_USERS\\.DEFAULT\\Control Panel\\International\\User Profile System Backup"};
+
+bool isRecursiveRegistryBranch(const std::string& branchPath)
+{
+    return kRecursiveRegistryBranches.find(branchPath) != kRecursiveRegistryBranches.end();
+}
+
 std::string trimWhitespace(const std::string& value)
 {
     std::string trimmed;
@@ -137,8 +147,16 @@ std::vector<RegistrySnapshot> parseRegistryEntries(
     std::vector<RegistrySnapshot> entries;
     std::stringstream stream(regOutput);
     std::string line;
+    std::string currentBranchPath = branchPath;
     while (std::getline(stream, line))
     {
+        const std::string trimmedLine = trimWhitespace(line);
+        if (trimmedLine.rfind("HKEY_", 0) == 0)
+        {
+            currentBranchPath = trimmedLine;
+            continue;
+        }
+
         const std::size_t tokenPos = line.find("REG_SZ");
         if (tokenPos == std::string::npos)
         {
@@ -154,7 +172,7 @@ std::vector<RegistrySnapshot> parseRegistryEntries(
         }
 
         RegistrySnapshot snapshot;
-        snapshot.branchPath = branchPath;
+        snapshot.branchPath = currentBranchPath;
         snapshot.valueName = valueName;
         snapshot.valueData = valueData;
         snapshot.layoutCode = layoutCode;
@@ -177,7 +195,8 @@ RegistrySnapshotsResult readRegistrySnapshots(const ghost::platform::ICommandRun
 
     for (const std::string& branchPath : ghost::platform::kRegistryBranches)
     {
-        const ghost::platform::CommandResult query = runner.run("reg query \"" + branchPath + "\"");
+        const std::string command = "reg query \"" + branchPath + "\"" + (isRecursiveRegistryBranch(branchPath) ? " /s" : "");
+        const ghost::platform::CommandResult query = runner.run(command);
         if (query.exitCode != 0)
         {
             const std::string& output = query.outputText;

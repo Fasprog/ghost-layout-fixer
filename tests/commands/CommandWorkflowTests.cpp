@@ -539,6 +539,7 @@ int main()
     ok = testRegistryFailures() && ok;
     ok = testRegistryMissingBranchIsSkipped() && ok;
     ok = testRegistryLcidLookupIsCaseInsensitive() && ok;
+    ok = testRegistryRecursiveUserProfileSubkeys() && ok;
     ok = testInstalledLanguageParsing() && ok;
     ok = testInstalledLanguageEmptyOnFailure() && ok;
     ok = testFixRejectsNonGhostLayoutWithNeutralInstalledTagAndAllowsGhostLayout() && ok;
