@@ -6,6 +6,7 @@
 #include <sstream>
 #include <cctype>
 #include <string_view>
+#include <algorithm>
 #include <unordered_map>
 #include <unordered_set>
 
@@ -40,6 +41,14 @@ const ghost::platform::ICommandRunner& defaultRunner()
     return runner;
 }
 
+bool isRecursiveRegistryBranch(const std::string& branchPath)
+{
+    return std::find(
+               ghost::platform::kRecursiveRegistryBranches.begin(),
+               ghost::platform::kRecursiveRegistryBranches.end(),
+               branchPath) != ghost::platform::kRecursiveRegistryBranches.end();
+}
+
 std::string trimWhitespace(const std::string& value)
 {
     std::string trimmed;
@@ -52,6 +61,23 @@ std::string trimWhitespace(const std::string& value)
     }
 
     return trimmed;
+}
+
+std::string trimEdges(const std::string& value)
+{
+    std::size_t begin = 0;
+    while (begin < value.size() && (value[begin] == ' ' || value[begin] == '\t' || value[begin] == '\r'))
+    {
+        ++begin;
+    }
+
+    std::size_t end = value.size();
+    while (end > begin && (value[end - 1] == ' ' || value[end - 1] == '\t' || value[end - 1] == '\r'))
+    {
+        --end;
+    }
+
+    return value.substr(begin, end - begin);
 }
 
 LcidMapResult buildLcidToLanguageTagMap(const ghost::platform::ICommandRunner& runner)
@@ -137,8 +163,16 @@ std::vector<RegistrySnapshot> parseRegistryEntries(
     std::vector<RegistrySnapshot> entries;
     std::stringstream stream(regOutput);
     std::string line;
+    std::string currentBranchPath = branchPath;
     while (std::getline(stream, line))
     {
+        const std::string trimmedLine = trimEdges(line);
+        if (trimmedLine.rfind("HKEY_", 0) == 0)
+        {
+            currentBranchPath = trimmedLine;
+            continue;
+        }
+
         const std::size_t tokenPos = line.find("REG_SZ");
         if (tokenPos == std::string::npos)
         {
@@ -154,7 +188,7 @@ std::vector<RegistrySnapshot> parseRegistryEntries(
         }
 
         RegistrySnapshot snapshot;
-        snapshot.branchPath = branchPath;
+        snapshot.branchPath = currentBranchPath;
         snapshot.valueName = valueName;
         snapshot.valueData = valueData;
         snapshot.layoutCode = layoutCode;
@@ -177,7 +211,8 @@ RegistrySnapshotsResult readRegistrySnapshots(const ghost::platform::ICommandRun
 
     for (const std::string& branchPath : ghost::platform::kRegistryBranches)
     {
-        const ghost::platform::CommandResult query = runner.run("reg query \"" + branchPath + "\"");
+        const std::string command = "reg query \"" + branchPath + "\"" + (isRecursiveRegistryBranch(branchPath) ? " /s" : "");
+        const ghost::platform::CommandResult query = runner.run(command);
         if (query.exitCode != 0)
         {
             const std::string& output = query.outputText;
