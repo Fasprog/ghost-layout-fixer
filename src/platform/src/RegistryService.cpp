@@ -6,6 +6,7 @@
 #include <sstream>
 #include <cctype>
 #include <string_view>
+#include <algorithm>
 #include <unordered_map>
 #include <unordered_set>
 
@@ -40,14 +41,12 @@ const ghost::platform::ICommandRunner& defaultRunner()
     return runner;
 }
 
-const std::unordered_set<std::string> kRecursiveRegistryBranches = {
-    "HKEY_CURRENT_USER\\Control Panel\\International\\User Profile",
-    "HKEY_USERS\\.DEFAULT\\Control Panel\\International\\User Profile",
-    "HKEY_USERS\\.DEFAULT\\Control Panel\\International\\User Profile System Backup"};
-
 bool isRecursiveRegistryBranch(const std::string& branchPath)
 {
-    return kRecursiveRegistryBranches.find(branchPath) != kRecursiveRegistryBranches.end();
+    return std::find(
+               ghost::platform::kRecursiveRegistryBranches.begin(),
+               ghost::platform::kRecursiveRegistryBranches.end(),
+               branchPath) != ghost::platform::kRecursiveRegistryBranches.end();
 }
 
 std::string trimWhitespace(const std::string& value)
@@ -62,6 +61,23 @@ std::string trimWhitespace(const std::string& value)
     }
 
     return trimmed;
+}
+
+std::string trimEdges(const std::string& value)
+{
+    std::size_t begin = 0;
+    while (begin < value.size() && (value[begin] == ' ' || value[begin] == '\t' || value[begin] == '\r'))
+    {
+        ++begin;
+    }
+
+    std::size_t end = value.size();
+    while (end > begin && (value[end - 1] == ' ' || value[end - 1] == '\t' || value[end - 1] == '\r'))
+    {
+        --end;
+    }
+
+    return value.substr(begin, end - begin);
 }
 
 LcidMapResult buildLcidToLanguageTagMap(const ghost::platform::ICommandRunner& runner)
@@ -150,7 +166,7 @@ std::vector<RegistrySnapshot> parseRegistryEntries(
     std::string currentBranchPath = branchPath;
     while (std::getline(stream, line))
     {
-        const std::string trimmedLine = trimWhitespace(line);
+        const std::string trimmedLine = trimEdges(line);
         if (trimmedLine.rfind("HKEY_", 0) == 0)
         {
             currentBranchPath = trimmedLine;

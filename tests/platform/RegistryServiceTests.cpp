@@ -171,3 +171,43 @@ bool testRegistryRecursiveUserProfileSubkeys()
         ok;
     return ok;
 }
+
+bool testRegistryRecursiveBranchPathPreservesSpaces()
+{
+    FakeCommandRunner runner;
+    runner.rules.push_back({"GetCultures", 0, "0809=en-GB\n"});
+    runner.rules.push_back(
+        {"reg query \"HKEY_CURRENT_USER\\Keyboard Layout\\Preload\"", 0, ""});
+    runner.rules.push_back(
+        {"reg query \"HKEY_CURRENT_USER\\Keyboard Layout\\Substitutes\"", 0, ""});
+    runner.rules.push_back(
+        {"reg query \"HKEY_USERS\\.DEFAULT\\Keyboard Layout\\Preload\"", 0, ""});
+    runner.rules.push_back(
+        {"reg query \"HKEY_USERS\\.DEFAULT\\Keyboard Layout\\Substitutes\"", 0, ""});
+    runner.rules.push_back(
+        {"reg query \"HKEY_CURRENT_USER\\Control Panel\\International\\User Profile\" /s", 0,
+         "   HKEY_CURRENT_USER\\Control Panel\\International\\User Profile\\en-GB\r\n"
+         "    1    REG_SZ    00000809\r\n"});
+    runner.rules.push_back(
+        {"reg query \"HKEY_USERS\\.DEFAULT\\Control Panel\\International\\User Profile\" /s", 1,
+         "ERROR: The system was unable to find the specified registry key or value."});
+    runner.rules.push_back(
+        {"reg query \"HKEY_USERS\\.DEFAULT\\Control Panel\\International\\User Profile System Backup\" /s", 1,
+         "ERROR: The system was unable to find the specified registry key or value."});
+
+    const ghost::platform::RegistryService service(&runner);
+    const ghost::platform::RegistryMatchesResult matchesResult = service.findLayoutMatches("en-GB");
+
+    bool ok = true;
+    ok = expect(matchesResult.success, "recursive parse succeeds for path line with leading spaces and CRLF") && ok;
+    ok = expect(matchesResult.values.size() == 1, "recursive parse finds one child key match") && ok;
+    if (!matchesResult.values.empty())
+    {
+        ok = expect(
+                 matchesResult.values[0].branchPath ==
+                     "HKEY_CURRENT_USER\\Control Panel\\International\\User Profile\\en-GB",
+                 "branchPath preserves internal spaces in Control Panel/User Profile segments") &&
+             ok;
+    }
+    return ok;
+}
