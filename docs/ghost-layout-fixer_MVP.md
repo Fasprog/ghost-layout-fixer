@@ -66,13 +66,16 @@ CLI-утилита для Windows, которая помогает убрать 
 Минимально:
 - `HKEY_CURRENT_USER\Keyboard Layout\Preload`
 - `HKEY_CURRENT_USER\Keyboard Layout\Substitutes`
-- `HKEY_USERS\.DEFAULT\Keyboard Layout\Preload`
+- `HKEY_USERS\.DEFAULT\Keyboard Layout\Preload`,
+- `HKEY_USERS\.DEFAULT\Keyboard Layout\Substitutes`,
+- `HKEY_CURRENT_USER\Control Panel\International\User Profile`,
+- `HKEY_USERS\\.DEFAULT\Control Panel\International\User Profile`,
+- `HKEY_USERS\\.DEFAULT\Control Panel\International\User Profile System Backup`
 
 ## 7. Ограничения MVP
 - без GUI;
 - без фоновой службы;
 - без автозапуска;
-- без поддержки всех раскладок мира;
 - без массового редактирования языковых профилей;
 - без гарантии исправления всех нестандартных кейсов Windows.
 
