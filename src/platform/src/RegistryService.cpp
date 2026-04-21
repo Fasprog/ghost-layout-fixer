@@ -6,6 +6,7 @@
 #include <sstream>
 #include <cctype>
 #include <string_view>
+#include <algorithm>
 #include <unordered_map>
 #include <unordered_set>
 
@@ -20,10 +21,32 @@ struct RegistrySnapshot
     std::string layoutCode;
 };
 
+struct LcidMapResult
+{
+    bool success{false};
+    std::unordered_map<std::string, std::string> mapping;
+    std::string error;
+};
+
+struct RegistrySnapshotsResult
+{
+    bool success{false};
+    std::vector<RegistrySnapshot> values;
+    std::string error;
+};
+
 const ghost::platform::ICommandRunner& defaultRunner()
 {
     static const ghost::platform::SystemCommandRunner runner;
     return runner;
+}
+
+bool isRecursiveRegistryBranch(const std::string& branchPath)
+{
+    return std::find(
+               ghost::platform::kRecursiveRegistryBranches.begin(),
+               ghost::platform::kRecursiveRegistryBranches.end(),
+               branchPath) != ghost::platform::kRecursiveRegistryBranches.end();
 }
 
 std::string trimWhitespace(const std::string& value)
@@ -40,7 +63,24 @@ std::string trimWhitespace(const std::string& value)
     return trimmed;
 }
 
-std::unordered_map<std::string, std::string> buildLcidToLanguageTagMap(const ghost::platform::ICommandRunner& runner)
+std::string trimEdges(const std::string& value)
+{
+    std::size_t begin = 0;
+    while (begin < value.size() && (value[begin] == ' ' || value[begin] == '\t' || value[begin] == '\r'))
+    {
+        ++begin;
+    }
+
+    std::size_t end = value.size();
+    while (end > begin && (value[end - 1] == ' ' || value[end - 1] == '\t' || value[end - 1] == '\r'))
+    {
+        --end;
+    }
+
+    return value.substr(begin, end - begin);
+}
+
+LcidMapResult buildLcidToLanguageTagMap(const ghost::platform::ICommandRunner& runner)
 {
     const ghost::platform::CommandResult result = runner.run(
         "powershell -NoProfile -Command "
@@ -48,10 +88,12 @@ std::unordered_map<std::string, std::string> buildLcidToLanguageTagMap(const gho
         "[System.Globalization.CultureTypes]::SpecificCultures"
         ") | ForEach-Object { '{0:X4}={1}' -f $_.LCID, $_.Name }\"");
 
-    std::unordered_map<std::string, std::string> mapping;
+    LcidMapResult mappingResult;
     if (result.exitCode != 0)
     {
-        return mapping;
+        mappingResult.success = false;
+        mappingResult.error = result.outputText.empty() ? "failed to build LCID mapping" : result.outputText;
+        return mappingResult;
     }
 
     std::string line;
@@ -68,11 +110,19 @@ std::unordered_map<std::string, std::string> buildLcidToLanguageTagMap(const gho
         const std::string languageTag = trimWhitespace(line.substr(separatorPos + 1));
         if (!lcidHex.empty() && !languageTag.empty())
         {
-            mapping[lcidHex] = languageTag;
+            mappingResult.mapping[lcidHex] = languageTag;
         }
     }
 
-    return mapping;
+    if (mappingResult.mapping.empty())
+    {
+        mappingResult.success = false;
+        mappingResult.error = "failed to build LCID mapping: command returned no valid values";
+        return mappingResult;
+    }
+
+    mappingResult.success = true;
+    return mappingResult;
 }
 
 std::string extractLanguageIdHex(const std::string& hkl)
@@ -82,7 +132,13 @@ std::string extractLanguageIdHex(const std::string& hkl)
         return {};
     }
 
-    return hkl.substr(hkl.size() - 4);
+    std::string lcidHex = hkl.substr(hkl.size() - 4);
+    for (char& symbol : lcidHex)
+    {
+        symbol = static_cast<char>(std::toupper(static_cast<unsigned char>(symbol)));
+    }
+
+    return lcidHex;
 }
 
 std::string hklToLayoutCode(
@@ -107,8 +163,16 @@ std::vector<RegistrySnapshot> parseRegistryEntries(
     std::vector<RegistrySnapshot> entries;
     std::stringstream stream(regOutput);
     std::string line;
+    std::string currentBranchPath = branchPath;
     while (std::getline(stream, line))
     {
+        const std::string trimmedLine = trimEdges(line);
+        if (trimmedLine.rfind("HKEY_", 0) == 0)
+        {
+            currentBranchPath = trimmedLine;
+            continue;
+        }
+
         const std::size_t tokenPos = line.find("REG_SZ");
         if (tokenPos == std::string::npos)
         {
@@ -124,7 +188,7 @@ std::vector<RegistrySnapshot> parseRegistryEntries(
         }
 
         RegistrySnapshot snapshot;
-        snapshot.branchPath = branchPath;
+        snapshot.branchPath = currentBranchPath;
         snapshot.valueName = valueName;
         snapshot.valueData = valueData;
         snapshot.layoutCode = layoutCode;
@@ -134,28 +198,49 @@ std::vector<RegistrySnapshot> parseRegistryEntries(
     return entries;
 }
 
-std::vector<RegistrySnapshot> readRegistrySnapshots(const ghost::platform::ICommandRunner& runner)
+RegistrySnapshotsResult readRegistrySnapshots(const ghost::platform::ICommandRunner& runner)
 {
-    const std::unordered_map<std::string, std::string> lcidMapping = buildLcidToLanguageTagMap(runner);
-    std::vector<RegistrySnapshot> snapshots;
-    if (lcidMapping.empty())
+    const LcidMapResult lcidMapResult = buildLcidToLanguageTagMap(runner);
+    RegistrySnapshotsResult snapshotsResult;
+    if (!lcidMapResult.success)
     {
-        return snapshots;
+        snapshotsResult.success = false;
+        snapshotsResult.error = lcidMapResult.error;
+        return snapshotsResult;
     }
 
     for (const std::string& branchPath : ghost::platform::kRegistryBranches)
     {
-        const ghost::platform::CommandResult query = runner.run("reg query \"" + branchPath + "\"");
+        const std::string command = "reg query \"" + branchPath + "\"" + (isRecursiveRegistryBranch(branchPath) ? " /s" : "");
+        const ghost::platform::CommandResult query = runner.run(command);
         if (query.exitCode != 0)
         {
-            continue;
+            const std::string& output = query.outputText;
+            const bool isMissingBranch =
+                output.find("unable to find the specified registry key or value") != std::string::npos ||
+                output.find("The system was unable to find the specified registry key or value") != std::string::npos ||
+                output.find("cannot find the file specified") != std::string::npos ||
+                output.find("не удается найти указанный раздел реестра или параметр") != std::string::npos ||
+                output.find("Системе не удается найти указанный путь") != std::string::npos;
+            if (isMissingBranch)
+            {
+                continue;
+            }
+
+            snapshotsResult.success = false;
+            snapshotsResult.error =
+                "failed to query registry branch " + branchPath +
+                (query.outputText.empty() ? std::string() : ": " + query.outputText);
+            return snapshotsResult;
         }
 
-        const std::vector<RegistrySnapshot> parsed = parseRegistryEntries(query.outputText, branchPath, lcidMapping);
-        snapshots.insert(snapshots.end(), parsed.begin(), parsed.end());
+        const std::vector<RegistrySnapshot> parsed =
+            parseRegistryEntries(query.outputText, branchPath, lcidMapResult.mapping);
+        snapshotsResult.values.insert(snapshotsResult.values.end(), parsed.begin(), parsed.end());
     }
 
-    return snapshots;
+    snapshotsResult.success = true;
+    return snapshotsResult;
 }
 
 bool isSafeRegistryBranchPath(const std::string& value)
@@ -214,11 +299,18 @@ namespace ghost::platform
 
 RegistryService::RegistryService(const ICommandRunner* runner) : runner_(runner != nullptr ? runner : &defaultRunner()) {}
 
-std::vector<RegistryMatch> RegistryService::findLayoutMatches(const std::string& layoutCode) const
+RegistryMatchesResult RegistryService::findLayoutMatches(const std::string& layoutCode) const
 {
-    const std::vector<RegistrySnapshot> snapshots = readRegistrySnapshots(*runner_);
-    std::vector<RegistryMatch> matches;
-    for (const RegistrySnapshot& snapshot : snapshots)
+    const RegistrySnapshotsResult snapshotsResult = readRegistrySnapshots(*runner_);
+    RegistryMatchesResult matchesResult;
+    if (!snapshotsResult.success)
+    {
+        matchesResult.success = false;
+        matchesResult.error = snapshotsResult.error;
+        return matchesResult;
+    }
+
+    for (const RegistrySnapshot& snapshot : snapshotsResult.values)
     {
         if (snapshot.layoutCode != layoutCode)
         {
@@ -229,26 +321,35 @@ std::vector<RegistryMatch> RegistryService::findLayoutMatches(const std::string&
         match.branchPath = snapshot.branchPath;
         match.valueName = snapshot.valueName;
         match.valueData = snapshot.valueData;
-        matches.push_back(match);
+        matchesResult.values.push_back(match);
     }
 
-    return matches;
+    matchesResult.success = true;
+    return matchesResult;
 }
 
-std::vector<std::string> RegistryService::listLayoutCodesFromRegistry() const
+RegistryLayoutsResult RegistryService::listLayoutCodesFromRegistry() const
 {
-    const std::vector<RegistrySnapshot> snapshots = readRegistrySnapshots(*runner_);
+    const RegistrySnapshotsResult snapshotsResult = readRegistrySnapshots(*runner_);
+    RegistryLayoutsResult layoutsResult;
+    if (!snapshotsResult.success)
+    {
+        layoutsResult.success = false;
+        layoutsResult.error = snapshotsResult.error;
+        return layoutsResult;
+    }
+
     std::unordered_set<std::string> seenLayouts;
-    std::vector<std::string> layouts;
-    for (const RegistrySnapshot& snapshot : snapshots)
+    for (const RegistrySnapshot& snapshot : snapshotsResult.values)
     {
         if (seenLayouts.insert(snapshot.layoutCode).second)
         {
-            layouts.push_back(snapshot.layoutCode);
+            layoutsResult.values.push_back(snapshot.layoutCode);
         }
     }
 
-    return layouts;
+    layoutsResult.success = true;
+    return layoutsResult;
 }
 
 std::vector<std::string> RegistryService::deleteMatches(const std::vector<RegistryMatch>& matches) const

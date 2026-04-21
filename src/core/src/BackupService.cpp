@@ -9,6 +9,7 @@
 #include <fstream>
 #include <iomanip>
 #include <sstream>
+#include <string>
 #include <string_view>
 #include <vector>
 #include <windows.h>
@@ -22,7 +23,34 @@ const ghost::platform::ICommandRunner& defaultRunner()
     return runner;
 }
 
-std::string stripRegHeader(const std::string& content)
+constexpr unsigned char kUtf16BomFirst = 0xFF;
+constexpr unsigned char kUtf16BomSecond = 0xFE;
+
+bool startsWithUtf16LeBom(const std::string& content)
+{
+    return content.size() >= 2 &&
+           static_cast<unsigned char>(content[0]) == kUtf16BomFirst &&
+           static_cast<unsigned char>(content[1]) == kUtf16BomSecond;
+}
+
+std::string stripRegHeaderFromUtf16Le(const std::string& content)
+{
+    static const std::string kUtf16HeaderTerminator(
+        "\x0D\x00\x0A\x00\x0D\x00\x0A\x00",
+        8);
+
+    std::size_t contentStart = startsWithUtf16LeBom(content) ? 2 : 0;
+    const std::size_t headerEnd = content.find(kUtf16HeaderTerminator, contentStart);
+    if (headerEnd == std::string::npos)
+    {
+        return content.substr(contentStart);
+    }
+
+    contentStart = headerEnd + kUtf16HeaderTerminator.size();
+    return content.substr(contentStart);
+}
+
+std::string stripRegHeaderFromAscii(const std::string& content)
 {
     const std::size_t windowsHeaderEnd = content.find("\r\n\r\n");
     if (windowsHeaderEnd != std::string::npos)
@@ -37,6 +65,21 @@ std::string stripRegHeader(const std::string& content)
     }
 
     return content;
+}
+
+std::string stripRegHeader(const std::string& content)
+{
+    if (startsWithUtf16LeBom(content))
+    {
+        return stripRegHeaderFromUtf16Le(content);
+    }
+
+    return stripRegHeaderFromAscii(content);
+}
+
+void writeUtf16Le(std::ofstream& stream, const std::u16string& text)
+{
+    stream.write(reinterpret_cast<const char*>(text.data()), static_cast<std::streamsize>(text.size() * sizeof(char16_t)));
 }
 
 bool hasRegExtensionCaseInsensitive(const std::filesystem::path& path)
@@ -73,25 +116,13 @@ bool isSafePathForCommand(const std::string& path)
 
 std::filesystem::path executableDirectory()
 {
-    std::wstring buffer(static_cast<std::size_t>(MAX_PATH), L'\0');
-    DWORD copied = 0;
-    while (true)
+    wchar_t buffer[MAX_PATH] = {};
+    const DWORD length = GetModuleFileNameW(nullptr, buffer, MAX_PATH);
+    if (length == 0 || length == MAX_PATH)
     {
-        copied = GetModuleFileNameW(nullptr, buffer.data(), static_cast<DWORD>(buffer.size()));
-        if (copied == 0)
-        {
-            return {};
-        }
-
-        if (copied < buffer.size() - 1)
-        {
-            break;
-        }
-
-        buffer.resize(buffer.size() * 2);
+        return {};
     }
 
-    buffer.resize(copied);
     return std::filesystem::path(buffer).parent_path();
 }
 
@@ -195,7 +226,8 @@ BackupReport BackupService::createBackup(const std::string& backupPath) const
         return report;
     }
 
-    mergedBackup << "Windows Registry Editor Version 5.00\r\n\r\n";
+    static const std::u16string kMergedHeader = u"\uFEFFWindows Registry Editor Version 5.00\r\n\r\n";
+    writeUtf16Le(mergedBackup, kMergedHeader);
     for (const std::filesystem::path& exportedFile : exportedFiles)
     {
         std::ifstream input(exportedFile, std::ios::binary);
@@ -207,7 +239,14 @@ BackupReport BackupService::createBackup(const std::string& backupPath) const
 
         std::stringstream buffer;
         buffer << input.rdbuf();
-        mergedBackup << stripRegHeader(buffer.str()) << "\r\n";
+        std::string stripped = stripRegHeader(buffer.str());
+        if (!stripped.empty())
+        {
+            mergedBackup.write(stripped.data(), static_cast<std::streamsize>(stripped.size()));
+        }
+
+        static const std::string kUtf16CrLf("\x0D\x00\x0A\x00", 4);
+        mergedBackup.write(kUtf16CrLf.data(), static_cast<std::streamsize>(kUtf16CrLf.size()));
     }
 
     cleanupExportedFiles();
@@ -219,6 +258,7 @@ BackupReport BackupService::createBackup(const std::string& backupPath) const
 
     if (!report.errors.empty())
     {
+        mergedBackup.close();
         std::error_code ignore;
         std::filesystem::remove(backupPath, ignore);
     }

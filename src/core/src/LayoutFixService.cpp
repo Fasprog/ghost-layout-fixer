@@ -30,22 +30,9 @@ std::string normalizeCode(const std::string& code)
     return normalized;
 }
 
-std::string primaryLanguageTag(const std::string& code)
-{
-    const std::string normalized = normalizeCode(code);
-    const std::size_t separatorPos = normalized.find('-');
-    if (separatorPos == std::string::npos)
-    {
-        return normalized;
-    }
-
-    return normalized.substr(0, separatorPos);
-}
-
 bool isInstalled(
     const std::string& registryLayout,
-    const std::unordered_set<std::string>& installedFullCodes,
-    const std::unordered_set<std::string>& installedPrimaryCodes)
+    const std::unordered_set<std::string>& installedFullCodes)
 {
     const std::string normalizedRegistry = normalizeCode(registryLayout);
     if (installedFullCodes.find(normalizedRegistry) != installedFullCodes.end())
@@ -53,14 +40,26 @@ bool isInstalled(
         return true;
     }
 
-    const std::string registryPrimary = primaryLanguageTag(registryLayout);
-    return installedPrimaryCodes.find(registryPrimary) != installedPrimaryCodes.end();
+    const std::size_t registrySeparatorPos = normalizedRegistry.find('-');
+    if (registrySeparatorPos == std::string::npos)
+    {
+        return false;
+    }
+
+    const std::string registryPrimary = normalizedRegistry.substr(0, registrySeparatorPos);
+    return installedFullCodes.find(registryPrimary) != installedFullCodes.end();
+}
+
+bool matchesRequestedLayout(
+    const std::string& requestedLayout,
+    const std::string& registryLayout)
+{
+    return normalizeCode(requestedLayout) == normalizeCode(registryLayout);
 }
 
 bool isValidLanguageTag(const std::string& value)
 {
-    static const std::regex kLanguageTagPattern(
-        "^[A-Za-z]{2,3}(?:-[A-Za-z0-9]{2,8})*$");
+    static const std::regex kLanguageTagPattern("^[A-Za-z]{2,3}(?:-[A-Za-z0-9]{2,8})*$");
     return std::regex_match(value, kLanguageTagPattern);
 }
 
@@ -82,16 +81,14 @@ ScanResult LayoutFixService::scan(
     result.installedLayouts = installedLayouts;
 
     std::unordered_set<std::string> installedFullCodes;
-    std::unordered_set<std::string> installedPrimaryCodes;
     for (const std::string& installedLayout : installedLayouts)
     {
         installedFullCodes.insert(normalizeCode(installedLayout));
-        installedPrimaryCodes.insert(primaryLanguageTag(installedLayout));
     }
 
     for (const std::string& layoutCode : registryLayouts)
     {
-        if (!isInstalled(layoutCode, installedFullCodes, installedPrimaryCodes))
+        if (!isInstalled(layoutCode, installedFullCodes))
         {
             result.ghostLayouts.push_back(layoutCode);
         }
@@ -143,18 +140,16 @@ FixReport LayoutFixService::executeFix(
     report.backupPath = backupPath;
     report.executedSteps.push_back("backup created: " + backupPath);
 
-    if (!isValidLanguageTag(layoutCode))
+    if (!isValidLayoutCodeFormat(layoutCode))
     {
-        report.errors.push_back("invalid layout code format: " + layoutCode);
+        report.errors.push_back("invalid layout code: " + layoutCode);
         report.success = false;
         return report;
     }
 
-    const std::string addCommand =
-        "powershell -NoProfile -Command \"$list = Get-WinUserLanguageList; "
-        "if (-not ($list.LanguageTag -contains '" +
-        layoutCode + "')) { $list.Add('" + layoutCode +
-        "'); Set-WinUserLanguageList $list -Force }\"";
+    const std::string addCommand = "powershell -NoProfile -Command \"$list = Get-WinUserLanguageList; "
+                                   "if (-not ($list.LanguageTag -contains '" + layoutCode + "')) { $list.Add('" + layoutCode +
+                                    "'); Set-WinUserLanguageList $list -Force }\"";
     const ghost::platform::CommandResult addResult = runner_->run(addCommand);
     report.executedSteps.push_back("standard add command: " + addCommand);
     if (addResult.exitCode != 0)
@@ -162,10 +157,9 @@ FixReport LayoutFixService::executeFix(
         report.errors.push_back("standard add failed: " + addResult.outputText);
     }
 
-    const std::string removeCommand =
-        "powershell -NoProfile -Command \"$list = Get-WinUserLanguageList; "
-        "$filtered = @($list | Where-Object { $_.LanguageTag -ne '" +
-        layoutCode + "' }); Set-WinUserLanguageList $filtered -Force\"";
+    const std::string removeCommand = "powershell -NoProfile -Command \"$list = Get-WinUserLanguageList; "
+                                      "$filtered = @($list | Where-Object { $_.LanguageTag -ne '" +
+                                      layoutCode + "' }); Set-WinUserLanguageList $filtered -Force\"";
     const ghost::platform::CommandResult removeResult = runner_->run(removeCommand);
     report.executedSteps.push_back("standard remove command: " + removeCommand);
     if (removeResult.exitCode != 0)
@@ -175,6 +169,53 @@ FixReport LayoutFixService::executeFix(
 
     report.success = report.errors.empty();
     return report;
+}
+
+bool LayoutFixService::isValidLayoutCode(const std::string& layoutCode) const
+{
+    if (!isValidLayoutCodeFormat(layoutCode))
+    {
+        return false;
+    }
+
+    const std::string validateCommand =
+        "powershell -NoProfile -Command \"$layout = '" + layoutCode +
+        "'; $match = [System.Globalization.CultureInfo]::GetCultures([System.Globalization.CultureTypes]::SpecificCultures) | "
+        "Where-Object { $_.Name -ieq $layout } | Select-Object -First 1; if ($null -eq $match) { exit 1 }\"";
+    const ghost::platform::CommandResult validateResult = runner_->run(validateCommand);
+    return validateResult.exitCode == 0;
+}
+
+bool LayoutFixService::isValidLayoutCodeFormat(const std::string& layoutCode) const
+{
+    return isValidLanguageTag(layoutCode);
+}
+
+bool LayoutFixService::isGhostLayout(
+    const std::string& layoutCode,
+    const std::vector<std::string>& registryLayouts,
+    const std::vector<std::string>& installedLayouts) const
+{
+    std::unordered_set<std::string> installedFullCodes;
+    for (const std::string& installedLayout : installedLayouts)
+    {
+        installedFullCodes.insert(normalizeCode(installedLayout));
+    }
+
+    for (const std::string& registryLayout : registryLayouts)
+    {
+        if (!matchesRequestedLayout(layoutCode, registryLayout))
+        {
+            continue;
+        }
+
+        if (!isInstalled(registryLayout, installedFullCodes))
+        {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 } // namespace ghost::core

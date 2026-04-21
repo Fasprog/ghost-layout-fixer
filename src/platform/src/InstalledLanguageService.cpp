@@ -53,12 +53,22 @@ InstalledLanguageService::InstalledLanguageService(const ICommandRunner* runner)
 {
 }
 
-std::vector<std::string> InstalledLanguageService::listInstalledLayoutCodes() const
+InstalledLayoutCodesResult InstalledLanguageService::listInstalledLayoutCodes() const
 {
     const CommandResult result = runner_->run(
         "powershell -NoProfile -Command \"(Get-WinUserLanguageList).LanguageTag\"");
 
-    return parseLanguageTags(result.outputText);
+    InstalledLayoutCodesResult readResult;
+    if (result.exitCode != 0)
+    {
+        readResult.success = false;
+        readResult.error = result.outputText.empty() ? "failed to query installed language tags" : result.outputText;
+        return readResult;
+    }
+
+    readResult.success = true;
+    readResult.values = parseLanguageTags(result.outputText);
+    return readResult;
 }
 
 } // namespace ghost::platform
